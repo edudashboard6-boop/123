@@ -1,0 +1,170 @@
+▲ Next.js 16.3.0 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.39:3000
+- Environments: .env
+✓ Ready in 1353ms
+✓ Running next.config.ts took 90ms
+
+⚠ Slow filesystem detected. The benchmark took 725ms. If /home/anand/Pictures/workspace/.next/dev is a network drive, consider moving it to a local folder.
+See more: https://nextjs.org/docs/app/guides/local-development
+ GET / 200 in 2.7s (next.js: 636ms, application-code: 2.0s)
+[browser] Encountered a script tag while rendering React component. Scripts inside React components are never executed when rendering on the client. Consider using template tag instead (https://developer.mozilla.org/en-US/docs/Web/HTML/Element/template). 
+[browser] Uncaught Error: Hydration failed because the server rendered HTML didn't match the client. As a result this tree will be regenerated on the client. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HTTPAccessFallbackBoundary notFound={{...}} forbidden={undefined} unauthorized={undefined}>
+      <HTTPAccessFallbackErrorBoundary pathname="/" notFound={{...}} forbidden={undefined} unauthorized={undefined} ...>
+        <RedirectBoundary>
+          <RedirectErrorBoundary router={{...}}>
+            <InnerLayoutRouter url="/" tree={[...]} params={{}} cacheNode={{rsc:{...}, ...}} segmentPath={[...]} ...>
+              <SegmentViewNode type="page" pagePath="page.tsx">
+                <SegmentTrieNode>
+                <ClientPageRoot Component={function Page} serverProvidedParams={{...}}>
+                  <Page params={Promise} searchParams={Promise}>
+                    <div className="flex h-dvh...">
+                      <AppSidebar>
+                      <div className="flex flex-...">
+                        <AppHeader>
+                          <header className="flex h-14 ...">
+                            <Button>
+                            <div>
+                            <div>
+                            <div>
+                            <div>
+                            <div>
+                            <Separator>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 te..." onClick={function onClick} ...>
+                              <button
+                                data-slot="button"
+                                className={"inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-m..."}
+                                onClick={function onClick}
++                               title="Switch to light mode"
+-                               title="Switch to dark mode"
+                              >
+                                <Sun className="h-4 w-4">
+                                  <svg
+                                    ref={null}
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width={24}
+                                    height={24}
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    strokeWidth={2}
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
++                                   className="lucide lucide-sun h-4 w-4"
+-                                   className="lucide lucide-moon h-4 w-4"
+                                    aria-hidden="true"
+                                  >
++                                   <circle cx="12" cy="12" r="4">
+-                                   <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z">
+                                    ...
+                                ...
+                            ...
+                        ...
+                      ...
+              ...
+            ...
+
+    at <unknown> (https://react.dev/link/hydration-mismatch)
+    at circle (<anonymous>)
+    at Array.map (<anonymous>)
+    at AppHeader (src/components/layout/app-header.tsx:195:29)
+    at Page (src/app/page.tsx:59:9)
+  193 |         title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+  194 |       >
+> 195 |         {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      |                             ^
+  196 |         <span className="sr-only">Toggle theme</span>
+  197 |       </Button>
+  198 |
+ GET /api/chat/sessions 200 in 935ms (next.js: 291ms, application-code: 644ms)
+ GET /api/providers 200 in 941ms (next.js: 634ms, application-code: 307ms)
+ GET /api/agents 200 in 953ms (next.js: 744ms, application-code: 208ms)
+ GET /api/chat/sessions 200 in 41ms (next.js: 12ms, application-code: 28ms)
+ GET /api/providers 200 in 44ms (next.js: 20ms, application-code: 24ms)
+ GET /api/agents 200 in 23ms (next.js: 5ms, application-code: 18ms)
+ GET /api/chat/sessions/54d78e96-3bad-4656-aa68-49fe73d41100/messages 200 in 1878ms (next.js: 1842ms, application-code: 36ms)
+[browser] Each child in a list should have a unique "key" prop.
+
+Check the render method of `div`. It was passed a child from MessageBubble. See https://react.dev/link/warning-keys for more information. 
+ GET /api/documents 200 in 362ms (next.js: 337ms, application-code: 24ms)
+ GET /api/documents 200 in 30ms (next.js: 7ms, application-code: 23ms)
+ GET /api/workspace?path=&sessionId=54d78e96-3bad-4656-aa68-49fe73d41100 200 in 160ms (next.js: 114ms, application-code: 46ms)
+ GET /api/workspace?path=&sessionId=54d78e96-3bad-4656-aa68-49fe73d41100 200 in 41ms (next.js: 8ms, application-code: 33ms)
+ POST /api/chat/sessions/54d78e96-3bad-4656-aa68-49fe73d41100/rollback 200 in 3.2s (next.js: 2.2s, application-code: 1018ms)
+ GET /api/chat/sessions/54d78e96-3bad-4656-aa68-49fe73d41100/messages 200 in 206ms (next.js: 141ms, application-code: 65ms)
+ GET /api/agents 200 in 18ms (next.js: 4ms, application-code: 14ms)
+ GET /api/agents 200 in 18ms (next.js: 5ms, application-code: 14ms)
+[browser] In HTML, <button> cannot be a descendant of <button>.
+This will cause a hydration error.
+
+  ...
+    <div className="max-w-5xl ...">
+      <div>
+      <div className="grid grid-...">
+        <AgentCard agent={{id:"eb08a1...", ...}} providers={[...]} onUpdate={function updateAgent} ...>
+          <Collapsible open={true} onOpenChange={function bound dispatchSetState}>
+            <Collapsible data-slot="collapsible" open={true} onOpenChange={function bound dispatchSetState}>
+              <CollapsibleProvider scope={undefined} disabled={undefined} contentId="radix-_r_2d_" open={true} ...>
+                <Primitive.div data-state="open" data-disabled={undefined} data-slot="collapsible" ref={null}>
+                  <div data-state="open" data-disabled={undefined} data-slot="collapsible" ref={null}>
+                    <Card className="border-l-4...">
+                      <div data-slot="card" className="text-card-...">
+                        <CollapsibleTrigger asChild={true}>
+                          <CollapsibleTrigger data-slot="collapsibl..." asChild={true}>
+                            <Primitive.button type="button" aria-controls="radix-_r_2d_" aria-expanded={true} ...>
+                              <Primitive.button.Slot type="button" aria-controls="radix-_r_2d_" aria-expanded={true} ...>
+>                               <button
+>                                 className="w-full text-left"
+>                                 type="button"
+>                                 aria-controls="radix-_r_2d_"
+>                                 aria-expanded={true}
+>                                 data-state="open"
+>                                 data-disabled={undefined}
+>                                 disabled={undefined}
+>                                 data-slot="collapsible-trigger"
+>                                 onClick={function handleEvent}
+>                                 ref={null}
+>                               >
+                                  ...
+                                    <SwitchTrigger data-slot="switch" className="peer data-..." id="active-arc..." ...>
+                                      <Primitive.button type="button" role="switch" aria-checked={true} ...>
+>                                       <button
+>                                         type="button"
+>                                         role="switch"
+>                                         aria-checked={true}
+>                                         aria-required={undefined}
+>                                         data-state="checked"
+>                                         data-disabled={undefined}
+>                                         disabled={undefined}
+>                                         value="on"
+>                                         data-slot="switch"
+>                                         className="peer data-[state=unchecked]:bg-input focus-visible:border-ring fo..."
+>                                         id="active-architect"
+>                                         onClick={function handleEvent}
+>                                         ref={function}
+>                                       >
+                                    ...
+                        ...
+        ...
+      ...
+ 
+[browser] <button> cannot contain a nested <button>.
+See this log for the ancestor stack trace. 
+ GET /api/workspace?path=&sessionId=54d78e96-3bad-4656-aa68-49fe73d41100 200 in 54ms (next.js: 13ms, application-code: 41ms)
+ GET /api/workspace?path=&sessionId=54d78e96-3bad-4656-aa68-49fe73d41100 200 in 63ms (next.js: 19ms, application-code: 44ms)
+ POST /api/chat/messages 200 in 76s (next.js: 260ms, application-code: 75s)
+ GET /api/workspace?path=&sessionId=54d78e96-3bad-4656-aa68-49fe73d41100 200 in 20ms (next.js: 5ms, application-code: 14ms)
+ GET /api/workspace?path=&sessionId=54d78e96-3bad-4656-aa68-49fe73d41100 200 in 15ms (next.js: 5ms, application-code: 11ms)

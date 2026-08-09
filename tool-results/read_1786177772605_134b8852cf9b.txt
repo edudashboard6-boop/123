@@ -1,0 +1,758 @@
+     1→'use client';
+     2→
+     3→import React, { useCallback, useEffect, useMemo, useState } from 'react';
+     4→import { toast } from 'sonner';
+     5→import {
+     6→  Wrench,
+     7→  Plus,
+     8→  Server,
+     9→  Terminal,
+    10→  Globe,
+    11→  GitBranch,
+    12→  Search,
+    13→  Shield,
+    14→  Eye,
+    15→  Mic,
+    16→  Database,
+    17→  FileText,
+    18→  FileCode,
+    19→  Trash2,
+    20→  Edit,
+    21→  Check,
+    22→  X,
+    23→  ChevronRight,
+    24→  Globe as GlobeIcon,
+    25→} from 'lucide-react';
+    26→
+    27→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    28→import { Button } from '@/components/ui/button';
+    29→import { Badge } from '@/components/ui/badge';
+    30→import { Label } from '@/components/ui/label';
+    31→import { Input } from '@/components/ui/input';
+    32→import { Switch } from '@/components/ui/switch';
+    33→import { Separator } from '@/components/ui/separator';
+    34→import { ScrollArea } from '@/components/ui/scroll-area';
+    35→import {
+    36→  Dialog,
+    37→  DialogContent,
+    38→  DialogHeader,
+    39→  DialogTitle,
+    40→  DialogDescription,
+    41→  DialogFooter,
+    42→} from '@/components/ui/dialog';
+    43→import {
+    44→  Select,
+    45→  SelectContent,
+    46→  SelectItem,
+    47→  SelectTrigger,
+    48→  SelectValue,
+    49→} from '@/components/ui/select';
+    50→import {
+    51→  Tooltip,
+    52→  TooltipContent,
+    53→  TooltipProvider,
+    54→  TooltipTrigger,
+    55→} from '@/components/ui/tooltip';
+    56→import {
+    57→  AlertDialog,
+    58→  AlertDialogContent,
+    59→  AlertDialogHeader,
+    60→  AlertDialogTitle,
+    61→  AlertDialogDescription,
+    62→  AlertDialogFooter,
+    63→  AlertDialogAction,
+    64→  AlertDialogCancel,
+    65→} from '@/components/ui/alert-dialog';
+    66→import {
+    67→  Accordion,
+    68→  AccordionContent,
+    69→  AccordionItem,
+    70→  AccordionTrigger,
+    71→} from '@/components/ui/accordion';
+    72→import { Skeleton } from '@/components/ui/skeleton';
+    73→
+    74→import { BUILT_IN_TOOLS } from '@/lib/constants';
+    75→import type { McpServer, TransportType } from '@/lib/types';
+    76→
+    77→// -----------------------------------------------------------------------------
+    78→// Helpers
+    79→// -----------------------------------------------------------------------------
+    80→
+    81→const TOOL_ICONS: Record<string, React.ElementType> = {
+    82→  web_search: Search,
+    83→  filesystem_read: FileText,
+    84→  filesystem_write: FileCode,
+    85→  git_operations: GitBranch,
+    86→  terminal_exec: Terminal,
+    87→  code_lint: Shield,
+    88→  code_test: Check,
+    89→  ocr_extract: Eye,
+    90→  vision_analyze: Eye,
+    91→  audio_transcribe: Mic,
+    92→  database_query: Database,
+    93→  rag_search: Database,
+    94→};
+    95→
+    96→const CATEGORY_LABELS: Record<string, string> = {
+    97→  information: 'Information',
+    98→  filesystem: 'Filesystem',
+    99→  devops: 'DevOps',
+   100→  system: 'System',
+   101→  quality: 'Quality',
+   102→  perception: 'Perception',
+   103→  data: 'Data',
+   104→  knowledge: 'Knowledge',
+   105→};
+   106→
+   107→const CATEGORY_COLORS: Record<string, string> = {
+   108→  information: 'bg-blue-900/25 text-blue-400 border-blue-700/30',
+   109→  filesystem: 'bg-emerald-900/25 text-emerald-400 border-emerald-700/30',
+   110→  devops: 'bg-orange-900/25 text-orange-400 border-orange-700/30',
+   111→  system: 'bg-red-900/25 text-red-400 border-red-700/30',
+   112→  quality: 'bg-cyan-900/25 text-cyan-400 border-cyan-700/30',
+   113→  perception: 'bg-amber-900/25 text-amber-400 border-amber-700/30',
+   114→  data: 'bg-purple-900/25 text-purple-400 border-purple-700/30',
+   115→  knowledge: 'bg-violet-900/25 text-violet-400 border-violet-700/30',
+   116→};
+   117→
+   118→const TRANSPORT_COLORS: Record<string, string> = {
+   119→  stdio: 'bg-accent/50 text-secondary-foreground border-border/50',
+   120→  sse: 'bg-emerald-900/25 text-emerald-400 border-emerald-700/30',
+   121→  'streamable-http': 'bg-amber-900/25 text-amber-400 border-amber-700/30',
+   122→};
+   123→
+   124→function toolIconForId(id: string): React.ElementType {
+   125→  return TOOL_ICONS[id] ?? Wrench;
+   126→}
+   127→
+   128→// -----------------------------------------------------------------------------
+   129→// Component
+   130→// -----------------------------------------------------------------------------
+   131→
+   132→export function ToolsPanel() {
+   133→  const [servers, setServers] = useState<McpServer[]>([]);
+   134→  const [loading, setLoading] = useState(true);
+   135→  const [toolToggles, setToolToggles] = useState<Record<string, boolean>>(() => {
+   136→    const init: Record<string, boolean> = {};
+   137→    BUILT_IN_TOOLS.forEach((t) => { init[t.id] = true; });
+   138→    return init;
+   139→  });
+   140→
+   141→  // Add/Edit dialog
+   142→  const [dialogOpen, setDialogOpen] = useState(false);
+   143→  const [editingServer, setEditingServer] = useState<McpServer | null>(null);
+   144→  const [saving, setSaving] = useState(false);
+   145→  const [form, setForm] = useState({
+   146→    name: '',
+   147→    description: '',
+   148→    transport: 'stdio' as TransportType,
+   149→    command: '',
+   150→    args: '',
+   151→    url: '',
+   152→    envVars: [{ key: '', value: '' }],
+   153→    isActive: true,
+   154→  });
+   155→
+   156→  // Delete confirmation
+   157→  const [deleteTarget, setDeleteTarget] = useState<McpServer | null>(null);
+   158→  const [deleting, setDeleting] = useState(false);
+   159→
+   160→  // ---------------------------------------------------------------------------
+   161→  // Fetch MCP servers
+   162→  // ---------------------------------------------------------------------------
+   163→
+   164→  const fetchServers = useCallback(async () => {
+   165→    setLoading(true);
+   166→    try {
+   167→      const res = await fetch('/api/mcp-servers');
+   168→      if (!res.ok) throw new Error('Failed to fetch servers');
+   169→      const data: McpServer[] = await res.json();
+   170→      setServers(data);
+   171→    } catch {
+   172→      setServers([]);
+   173→    } finally {
+   174→      setLoading(false);
+   175→    }
+   176→  }, []);
+   177→
+   178→  useEffect(() => {
+   179→    fetchServers();
+   180→  }, [fetchServers]);
+   181→
+   182→  // ---------------------------------------------------------------------------
+   183→  // Group built-in tools by category
+   184→  // ---------------------------------------------------------------------------
+   185→
+   186→  const toolsByCategory = useMemo(() => {
+   187→    const map = new Map<string, typeof BUILT_IN_TOOLS>();
+   188→    BUILT_IN_TOOLS.forEach((tool) => {
+   189→      const cat = tool.category;
+   190→      if (!map.has(cat)) map.set(cat, []);
+   191→      map.get(cat)!.push(tool);
+   192→    });
+   193→    return map;
+   194→  }, []);
+   195→
+   196→  // ---------------------------------------------------------------------------
+   197→  // Dialog helpers
+   198→  // ---------------------------------------------------------------------------
+   199→
+   200→  const openAddDialog = useCallback(() => {
+   201→    setEditingServer(null);
+   202→    setForm({
+   203→      name: '',
+   204→      description: '',
+   205→      transport: 'stdio',
+   206→      command: '',
+   207→      args: '',
+   208→      url: '',
+   209→      envVars: [{ key: '', value: '' }],
+   210→      isActive: true,
+   211→    });
+   212→    setDialogOpen(true);
+   213→  }, []);
+   214→
+   215→  const openEditDialog = useCallback((server: McpServer) => {
+   216→    setEditingServer(server);
+   217→    setForm({
+   218→      name: server.name,
+   219→      description: server.description,
+   220→      transport: server.transport,
+   221→      command: server.command,
+   222→      args: server.args.join(', '),
+   223→      url: server.url,
+   224→      envVars: Object.entries(server.envVars).map(([key, value]) => ({ key, value })),
+   225→      isActive: server.isActive,
+   226→    });
+   227→    setDialogOpen(true);
+   228→  }, []);
+   229→
+   230→  const updateForm = useCallback(<K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+   231→    setForm((prev) => ({ ...prev, [key]: value }));
+   232→  }, []);
+   233→
+   234→  // ---------------------------------------------------------------------------
+   235→  // Save (create or update)
+   236→  // ---------------------------------------------------------------------------
+   237→
+   238→  const handleSave = useCallback(async () => {
+   239→    if (!form.name.trim()) {
+   240→      toast.error('Server name is required');
+   241→      return;
+   242→    }
+   243→
+   244→    const envObj: Record<string, string> = {};
+   245→    form.envVars.forEach(({ key, value }) => {
+   246→      if (key.trim()) envObj[key.trim()] = value;
+   247→    });
+   248→
+   249→    const payload = {
+   250→      name: form.name.trim(),
+   251→      description: form.description.trim(),
+   252→      transport: form.transport,
+   253→      command: form.command.trim(),
+   254→      args: form.args.split(',').map((a) => a.trim()).filter(Boolean),
+   255→      url: form.url.trim(),
+   256→      envVars: envObj,
+   257→      isActive: form.isActive,
+   258→    };
+   259→
+   260→    setSaving(true);
+   261→    try {
+   262→      const isEdit = !!editingServer;
+   263→      const url = isEdit
+   264→        ? `/api/mcp-servers/${editingServer.id}`
+   265→        : '/api/mcp-servers';
+   266→      const method = isEdit ? 'PATCH' : 'POST';
+   267→
+   268→      const res = await fetch(url, {
+   269→        method,
+   270→        headers: { 'Content-Type': 'application/json' },
+   271→        body: JSON.stringify(payload),
+   272→      });
+   273→
+   274→      if (!res.ok) {
+   275→        const body = await res.json().catch(() => ({}));
+   276→        throw new Error(body.error ?? `Failed to ${isEdit ? 'update' : 'create'} server`);
+   277→      }
+   278→
+   279→      const saved: McpServer = await res.json();
+   280→      if (isEdit) {
+   281→        setServers((prev) => prev.map((s) => (s.id === saved.id ? saved : s)));
+   282→        toast.success(`Updated ${saved.name}`);
+   283→      } else {
+   284→        setServers((prev) => [...prev, saved]);
+   285→        toast.success(`Added ${saved.name}`);
+   286→      }
+   287→      setDialogOpen(false);
+   288→    } catch (err) {
+   289→      toast.error(err instanceof Error ? err.message : 'Save failed');
+   290→    } finally {
+   291→      setSaving(false);
+   292→    }
+   293→  }, [form, editingServer]);
+   294→
+   295→  // ---------------------------------------------------------------------------
+   296→  // Delete
+   297→  // ---------------------------------------------------------------------------
+   298→
+   299→  const handleDelete = useCallback(async () => {
+   300→    if (!deleteTarget) return;
+   301→    setDeleting(true);
+   302→    try {
+   303→      const res = await fetch(`/api/mcp-servers/${deleteTarget.id}`, { method: 'DELETE' });
+   304→      if (!res.ok) throw new Error('Delete failed');
+   305→      setServers((prev) => prev.filter((s) => s.id !== deleteTarget.id));
+   306→      toast.success(`Deleted ${deleteTarget.name}`);
+   307→    } catch {
+   308→      toast.error('Failed to delete server');
+   309→    } finally {
+   310→      setDeleting(false);
+   311→      setDeleteTarget(null);
+   312→    }
+   313→  }, [deleteTarget]);
+   314→
+   315→  // ---------------------------------------------------------------------------
+   316→  // Render
+   317→  // ---------------------------------------------------------------------------
+   318→
+   319→  return (
+   320→    <TooltipProvider>
+   321→      <div className="flex h-full flex-col min-h-0">
+   322→        {/* Header */}
+   323→        <div className="flex flex-col gap-1 border-b border-border/60 px-6 py-4">
+   324→          <div className="flex items-center justify-between">
+   325→            <div className="flex items-center gap-3">
+   326→              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600/15 border border-violet-500/20">
+   327→                <Wrench className="h-4.5 w-4.5 text-violet-400" />
+   328→              </div>
+   329→              <div>
+   330→                <h1 className="text-base font-semibold text-foreground">Tools & Integrations</h1>
+   331→                <p className="text-xs text-muted-foreground/70">Configure MCP servers and tool permissions</p>
+   332→              </div>
+   333→            </div>
+   334→            <Button
+   335→              size="sm"
+   336→              className="bg-violet-600 hover:bg-violet-500 text-white gap-1.5"
+   337→              onClick={openAddDialog}
+   338→            >
+   339→              <Plus className="h-3.5 w-3.5" />
+   340→              Add Server
+   341→            </Button>
+   342→          </div>
+   343→        </div>
+   344→
+   345→        <ScrollArea className="flex-1 min-h-0">
+   346→          <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
+   347→
+   348→            {/* Built-in Tools */}
+   349→            <Card className="bg-card/80 border-border/60">
+   350→              <CardHeader className="pb-3">
+   351→                <div>
+   352→                  <CardTitle className="text-sm font-semibold text-secondary-foreground">Built-in Tools</CardTitle>
+   353→                  <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   354→                    {BUILT_IN_TOOLS.length} tools available to agents. Toggle to enable or disable.
+   355→                  </CardDescription>
+   356→                </div>
+   357→              </CardHeader>
+   358→              <CardContent className="pt-0">
+   359→                <Accordion type="multiple" defaultValue={Object.keys(toolsByCategory)} className="w-full">
+   360→                  {Array.from(toolsByCategory.entries()).map(([category, tools]) => (
+   361→                    <AccordionItem key={category} value={category} className="border-border/40">
+   362→                      <AccordionTrigger className="py-2.5 hover:no-underline">
+   363→                        <div className="flex items-center gap-2">
+   364→                          <Badge
+   365→                            variant="outline"
+   366→                            className={`text-[10px] h-4 px-1.5 border ${CATEGORY_COLORS[category] ?? CATEGORY_COLORS.system}`}
+   367→                          >
+   368→                            {CATEGORY_LABELS[category] ?? category}
+   369→                          </Badge>
+   370→                          <span className="text-xs text-muted-foreground/70">{tools.length} tools</span>
+   371→                        </div>
+   372→                      </AccordionTrigger>
+   373→                      <AccordionContent>
+   374→                        <div className="space-y-1">
+   375→                          {tools.map((tool) => {
+   376→                            const Icon = toolIconForId(tool.id);
+   377→                            return (
+   378→                              <div
+   379→                                key={tool.id}
+   380→                                className="group flex items-center justify-between gap-3 rounded-lg px-3 py-2 hover:"
+   381→                              >
+   382→                                <div className="flex items-center gap-3 min-w-0">
+   383→                                  <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md">
+   384→                                    <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+   385→                                  </div>
+   386→                                  <div className="min-w-0">
+   387→                                    <p className="text-xs font-medium text-secondary-foreground">{tool.name}</p>
+   388→                                    <p className="text-[11px] text-muted-foreground/50 truncate max-w-md">{tool.description}</p>
+   389→                                  </div>
+   390→                                </div>
+   391→                                <Switch
+   392→                                  checked={toolToggles[tool.id] ?? true}
+   393→                                  onCheckedChange={(checked) =>
+   394→                                    setToolToggles((prev) => ({ ...prev, [tool.id]: checked }))
+   395→                                  }
+   396→                                  className="data-[state=checked]:bg-violet-600"
+   397→                                />
+   398→                              </div>
+   399→                            );
+   400→                          })}
+   401→                        </div>
+   402→                      </AccordionContent>
+   403→                    </AccordionItem>
+   404→                  ))}
+   405→                </Accordion>
+   406→              </CardContent>
+   407→            </Card>
+   408→
+   409→            {/* MCP Servers */}
+   410→            <div>
+   411→              <div className="flex items-center justify-between mb-3">
+   412→                <h2 className="text-sm font-semibold text-secondary-foreground">MCP Servers</h2>
+   413→                <span className="text-xs text-muted-foreground/70">{servers.length} configured</span>
+   414→              </div>
+   415→
+   416→              {loading ? (
+   417→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   418→                  {Array.from({ length: 2 }).map((_, i) => (
+   419→                    <Skeleton key={i} className="h-40 rounded-xl bg-card/60" />
+   420→                  ))}
+   421→                </div>
+   422→              ) : servers.length === 0 ? (
+   423→                <div className="flex flex-col items-center justify-center py-16">
+   424→                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl">
+   425→                    <Server className="h-6 w-6 text-muted-foreground/50" />
+   426→                  </div>
+   427→                  <p className="text-sm font-medium text-muted-foreground">No MCP servers configured</p>
+   428→                  <p className="mt-1 text-xs text-muted-foreground/50 max-w-xs text-center">
+   429→                    Add MCP servers to extend agent capabilities with external tools and services.
+   430→                  </p>
+   431→                </div>
+   432→              ) : (
+   433→                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   434→                  {servers.map((server) => (
+   435→                    <Card
+   436→                      key={server.id}
+   437→                      className="group relative bg-card/80 border-border/60 hover:border-violet-500/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.06)] transition-all duration-200 overflow-hidden"
+   438→                    >
+   439→                      <CardContent className="p-4">
+   440→                        <div className="flex items-start justify-between gap-2 mb-3">
+   441→                          <div className="flex items-center gap-2.5 min-w-0">
+   442→                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+   443→                              <Server className="h-4 w-4 text-muted-foreground" />
+   444→                            </div>
+   445→                            <div className="min-w-0">
+   446→                              <p className="text-sm font-medium text-secondary-foreground truncate" title={server.name}>
+   447→                                {server.name}
+   448→                              </p>
+   449→                              <div className="flex items-center gap-1.5 mt-0.5">
+   450→                                <span
+   451→                                  className={`inline-block h-1.5 w-1.5 rounded-full ${
+   452→                                    server.isActive ? 'bg-emerald-500' : 'bg-red-500'
+   453→                                  }`}
+   454→                                />
+   455→                                <span className="text-[11px] text-muted-foreground/70">
+   456→                                  {server.isActive ? 'Active' : 'Inactive'}
+   457→                                </span>
+   458→                              </div>
+   459→                            </div>
+   460→                          </div>
+   461→                          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+   462→                            <Tooltip>
+   463→                              <TooltipTrigger asChild>
+   464→                                <Button
+   465→                                  variant="ghost"
+   466→                                  size="icon"
+   467→                                  className="h-7 w-7 text-muted-foreground/70 hover:text-secondary-foreground hover:"
+   468→                                  onClick={() => openEditDialog(server)}
+   469→                                >
+   470→                                  <Edit className="h-3 w-3" />
+   471→                                </Button>
+   472→                              </TooltipTrigger>
+   473→                              <TooltipContent side="left" >
+   474→                                Edit server
+   475→                              </TooltipContent>
+   476→                            </Tooltip>
+   477→                            <Tooltip>
+   478→                              <TooltipTrigger asChild>
+   479→                                <Button
+   480→                                  variant="ghost"
+   481→                                  size="icon"
+   482→                                  className="h-7 w-7 text-muted-foreground/70 hover:text-red-400 hover:bg-red-500/10"
+   483→                                  onClick={() => setDeleteTarget(server)}
+   484→                                >
+   485→                                  <Trash2 className="h-3 w-3" />
+   486→                                </Button>
+   487→                              </TooltipTrigger>
+   488→                              <TooltipContent side="left" >
+   489→                                Delete server
+   490→                              </TooltipContent>
+   491→                            </Tooltip>
+   492→                          </div>
+   493→                        </div>
+   494→
+   495→                        {server.description && (
+   496→                          <p className="text-[11px] text-muted-foreground/70 mb-3 line-clamp-2 leading-relaxed">
+   497→                            {server.description}
+   498→                          </p>
+   499→                        )}
+   500→
+   501→                        <div className="flex items-center gap-2 flex-wrap">
+   502→                          <Badge
+   503→                            variant="outline"
+   504→                            className={`text-[10px] h-4 px-1.5 border ${TRANSPORT_COLORS[server.transport] ?? TRANSPORT_COLORS.stdio}`}
+   505→                          >
+   506→                            {server.transport}
+   507→                          </Badge>
+   508→                          {server.tools.length > 0 && (
+   509→                            <Badge
+   510→                              variant="outline"
+   511→                              className="text-[10px] h-4 px-1.5 border-input/40"
+   512→                            >
+   513→                              {server.tools.length} tools
+   514→                            </Badge>
+   515→                          )}
+   516→                        </div>
+   517→
+   518→                        <div className="mt-3 rounded-md">
+   519→                          <p className="text-[10px] font-mono text-muted-foreground/70 truncate">
+   520→                            {server.transport === 'stdio'
+   521→                              ? `$ ${server.command} ${server.args.join(' ')}`
+   522→                              : server.url}
+   523→                          </p>
+   524→                        </div>
+   525→                      </CardContent>
+   526→                    </Card>
+   527→                  ))}
+   528→                </div>
+   529→              )}
+   530→            </div>
+   531→
+   532→          </div>
+   533→        </ScrollArea>
+   534→
+   535→        {/* Add/Edit Server Dialog */}
+   536→        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+   537→          <DialogContent className="bg-popover border-border max-w-lg max-h-[90vh] overflow-y-auto">
+   538→            <DialogHeader>
+   539→              <DialogTitle className="text-popover-foreground">
+   540→                {editingServer ? 'Edit MCP Server' : 'Add MCP Server'}
+   541→              </DialogTitle>
+   542→              <DialogDescription className="text-muted-foreground">
+   543→                {editingServer
+   544→                  ? 'Update the MCP server configuration.'
+   545→                  : 'Connect a new MCP server to extend agent capabilities.'}
+   546→              </DialogDescription>
+   547→            </DialogHeader>
+   548→
+   549→            <div className="space-y-4">
+   550→              {/* Name */}
+   551→              <div className="space-y-1.5">
+   552→                <Label className="text-xs text-muted-foreground">Name *</Label>
+   553→                <Input
+   554→                  value={form.name}
+   555→                  onChange={(e) => updateForm('name', e.target.value)}
+   556→                  placeholder="e.g., github-mcp"
+   557→                  className="h-8"
+   558→                />
+   559→              </div>
+   560→
+   561→              {/* Description */}
+   562→              <div className="space-y-1.5">
+   563→                <Label className="text-xs text-muted-foreground">Description</Label>
+   564→                <Input
+   565→                  value={form.description}
+   566→                  onChange={(e) => updateForm('description', e.target.value)}
+   567→                  placeholder="What does this server do?"
+   568→                  className="h-8"
+   569→                />
+   570→              </div>
+   571→
+   572→              {/* Transport Type */}
+   573→              <div className="space-y-1.5">
+   574→                <Label className="text-xs text-muted-foreground">Transport Type</Label>
+   575→                <Select
+   576→                  value={form.transport}
+   577→                  onValueChange={(v) => updateForm('transport', v as TransportType)}
+   578→                >
+   579→                  <SelectTrigger className="h-8">
+   580→                    <SelectValue />
+   581→                  </SelectTrigger>
+   582→                  <SelectContent className="bg-popover border-border">
+   583→                    <SelectItem value="stdio" className="text-secondary-foreground">
+   584→                      <div className="flex items-center gap-2">
+   585→                        <Terminal className="h-3 w-3" /> stdio
+   586→                      </div>
+   587→                    </SelectItem>
+   588→                    <SelectItem value="sse" className="text-secondary-foreground">
+   589→                      <div className="flex items-center gap-2">
+   590→                        <GlobeIcon className="h-3 w-3" /> SSE
+   591→                      </div>
+   592→                    </SelectItem>
+   593→                    <SelectItem value="streamable-http" className="text-secondary-foreground">
+   594→                      <div className="flex items-center gap-2">
+   595→                        <Globe className="h-3 w-3" /> Streamable HTTP
+   596→                      </div>
+   597→                    </SelectItem>
+   598→                  </SelectContent>
+   599→                </Select>
+   600→              </div>
+   601→
+   602→              {/* Command (stdio) */}
+   603→              {form.transport === 'stdio' && (
+   604→                <div className="space-y-1.5">
+   605→                  <Label className="text-xs text-muted-foreground">Command</Label>
+   606→                  <Input
+   607→                    value={form.command}
+   608→                    onChange={(e) => updateForm('command', e.target.value)}
+   609→                    placeholder="npx, python, uvx, ..."
+   610→                    className="h-8"
+   611→                  />
+   612→                </div>
+   613→              )}
+   614→
+   615→              {/* Args (stdio) */}
+   616→              {form.transport === 'stdio' && (
+   617→                <div className="space-y-1.5">
+   618→                  <Label className="text-xs text-muted-foreground">Arguments (comma-separated)</Label>
+   619→                  <Input
+   620→                    value={form.args}
+   621→                    onChange={(e) => updateForm('args', e.target.value)}
+   622→                    placeholder="-y, @modelcontextprotocol/server-filesystem, /path"
+   623→                    className="h-8"
+   624→                  />
+   625→                </div>
+   626→              )}
+   627→
+   628→              {/* URL (sse / streamable-http) */}
+   629→              {form.transport !== 'stdio' && (
+   630→                <div className="space-y-1.5">
+   631→                  <Label className="text-xs text-muted-foreground">Server URL</Label>
+   632→                  <Input
+   633→                    value={form.url}
+   634→                    onChange={(e) => updateForm('url', e.target.value)}
+   635→                    placeholder="http://localhost:8080/mcp"
+   636→                    className="h-8"
+   637→                  />
+   638→                </div>
+   639→              )}
+   640→
+   641→              <Separator  />
+   642→
+   643→              {/* Environment Variables */}
+   644→              <div className="space-y-2">
+   645→                <div className="flex items-center justify-between">
+   646→                  <Label className="text-xs text-muted-foreground">Environment Variables</Label>
+   647→                  <Button
+   648→                    variant="ghost"
+   649→                    size="sm"
+   650→                    className="h-6 text-[11px] text-violet-400 hover:text-violet-300 hover:bg-violet-500/10 gap-1"
+   651→                    onClick={() => setForm((prev) => ({ ...prev, envVars: [...prev.envVars, { key: '', value: '' }] }))}
+   652→                  >
+   653→                    <Plus className="h-2.5 w-2.5" />
+   654→                    Add
+   655→                  </Button>
+   656→                </div>
+   657→                <div className="space-y-2">
+   658→                  {form.envVars.map((env, i) => (
+   659→                    <div key={i} className="flex items-center gap-2">
+   660→                      <Input
+   661→                        value={env.key}
+   662→                        onChange={(e) => {
+   663→                          const updated = [...form.envVars];
+   664→                          updated[i] = { ...updated[i], key: e.target.value };
+   665→                          setForm((prev) => ({ ...prev, envVars: updated }));
+   666→                        }}
+   667→                        placeholder="KEY"
+   668→                        className="h-7"
+   669→                      />
+   670→                      <span className="text-muted-foreground/50 text-xs">=</span>
+   671→                      <Input
+   672→                        value={env.value}
+   673→                        onChange={(e) => {
+   674→                          const updated = [...form.envVars];
+   675→                          updated[i] = { ...updated[i], value: e.target.value };
+   676→                          setForm((prev) => ({ ...prev, envVars: updated }));
+   677→                        }}
+   678→                        placeholder="value"
+   679→                        className="h-7"
+   680→                      />
+   681→                      {form.envVars.length > 1 && (
+   682→                        <Button
+   683→                          variant="ghost"
+   684→                          size="icon"
+   685→                          className="h-7 w-7 text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 shrink-0"
+   686→                          onClick={() => {
+   687→                            const updated = form.envVars.filter((_, idx) => idx !== i);
+   688→                            setForm((prev) => ({ ...prev, envVars: updated }));
+   689→                          }}
+   690→                        >
+   691→                          <X className="h-3 w-3" />
+   692→                        </Button>
+   693→                      )}
+   694→                    </div>
+   695→                  ))}
+   696→                </div>
+   697→              </div>
+   698→
+   699→              <Separator  />
+   700→
+   701→              {/* Active toggle */}
+   702→              <div className="flex items-center justify-between">
+   703→                <Label className="text-xs text-muted-foreground">Active</Label>
+   704→                <Switch
+   705→                  checked={form.isActive}
+   706→                  onCheckedChange={(checked) => updateForm('isActive', checked)}
+   707→                  className="data-[state=checked]:bg-violet-600"
+   708→                />
+   709→              </div>
+   710→            </div>
+   711→
+   712→            <DialogFooter className="gap-2 pt-2">
+   713→              <Button
+   714→                variant="outline"
+   715→                
+   716→                onClick={() => setDialogOpen(false)}
+   717→              >
+   718→                Cancel
+   719→              </Button>
+   720→              <Button
+   721→                className="bg-violet-600 hover:bg-violet-500 text-white"
+   722→                onClick={handleSave}
+   723→                disabled={saving || !form.name.trim()}
+   724→              >
+   725→                {saving ? 'Saving...' : editingServer ? 'Update Server' : 'Add Server'}
+   726→              </Button>
+   727→            </DialogFooter>
+   728→          </DialogContent>
+   729→        </Dialog>
+   730→
+   731→        {/* Delete Confirmation Dialog */}
+   732→        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+   733→          <AlertDialogContent className="bg-popover border-border">
+   734→            <AlertDialogHeader>
+   735→              <AlertDialogTitle className="text-popover-foreground">Delete MCP Server</AlertDialogTitle>
+   736→              <AlertDialogDescription className="text-muted-foreground">
+   737→                Are you sure you want to delete <span className="text-secondary-foreground font-medium">{deleteTarget?.name}</span>? This will disconnect the server and remove its configuration.
+   738→              </AlertDialogDescription>
+   739→            </AlertDialogHeader>
+   740→            <AlertDialogFooter>
+   741→              <AlertDialogCancel >
+   742→                Cancel
+   743→              </AlertDialogCancel>
+   744→              <AlertDialogAction
+   745→                className="bg-red-600 hover:bg-red-500 text-white"
+   746→                onClick={handleDelete}
+   747→                disabled={deleting}
+   748→              >
+   749→                {deleting ? 'Deleting...' : 'Delete'}
+   750→              </AlertDialogAction>
+   751→            </AlertDialogFooter>
+   752→          </AlertDialogContent>
+   753→        </AlertDialog>
+   754→      </div>
+   755→    </TooltipProvider>
+   756→  );
+   757→}
+   758→

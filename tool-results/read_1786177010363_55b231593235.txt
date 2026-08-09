@@ -1,0 +1,659 @@
+     1→'use client';
+     2→
+     3→import React, { useCallback, useEffect, useRef, useState } from 'react';
+     4→import { useTheme } from 'next-themes';
+     5→import { toast } from 'sonner';
+     6→import {
+     7→  Settings,
+     8→  Moon,
+     9→  Sun,
+    10→  DollarSign,
+    11→  AlertTriangle,
+    12→  Info,
+    13→  ExternalLink,
+    14→  ChevronRight,
+    15→  RotateCcw,
+    16→  Save,
+    17→  Check,
+    18→  Shield,
+    19→} from 'lucide-react';
+    20→
+    21→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    22→import { Button } from '@/components/ui/button';
+    23→import { Badge } from '@/components/ui/badge';
+    24→import { Label } from '@/components/ui/label';
+    25→import { Input } from '@/components/ui/input';
+    26→import { Slider } from '@/components/ui/slider';
+    27→import { Switch } from '@/components/ui/switch';
+    28→import { Separator } from '@/components/ui/separator';
+    29→import { ScrollArea } from '@/components/ui/scroll-area';
+    30→import {
+    31→  Select,
+    32→  SelectContent,
+    33→  SelectItem,
+    34→  SelectTrigger,
+    35→  SelectValue,
+    36→} from '@/components/ui/select';
+    37→import {
+    38→  Tooltip,
+    39→  TooltipContent,
+    40→  TooltipProvider,
+    41→  TooltipTrigger,
+    42→} from '@/components/ui/tooltip';
+    43→import type { DebateMode } from '@/lib/types';
+    44→
+    45→// -----------------------------------------------------------------------------
+    46→// Types
+    47→// -----------------------------------------------------------------------------
+    48→
+    49→interface AppSettings {
+    50→  theme: 'dark' | 'light';
+    51→  language: string;
+    52→  defaultDebateMode: DebateMode;
+    53→  autoSave: boolean;
+    54→  sessionBudgetLimit: number;
+    55→  agentBudgetLimits: Record<string, number>;
+    56→  budgetAlertThreshold: number;
+    57→  sandboxMode: boolean;
+    58→  autoApproveTools: boolean;
+    59→  auditLogging: boolean;
+    60→  secretStorage: string;
+    61→  contextWindowBudget: number;
+    62→  maxDebateRounds: number;
+    63→  fallbackOnError: boolean;
+    64→  telemetry: boolean;
+    65→}
+    66→
+    67→const DEFAULT_SETTINGS: AppSettings = {
+    68→  theme: 'dark',
+    69→  language: 'en',
+    70→  defaultDebateMode: 'fast',
+    71→  autoSave: true,
+    72→  sessionBudgetLimit: 10,
+    73→  agentBudgetLimits: {
+    74→    architect: 5,
+    75→    forge: 10,
+    76→    sentinel: 5,
+    77→    perception: 3,
+    78→    scribe: 3,
+    79→  },
+    80→  budgetAlertThreshold: 75,
+    81→  sandboxMode: true,
+    82→  autoApproveTools: false,
+    83→  auditLogging: true,
+    84→  secretStorage: 'OS Keychain',
+    85→  contextWindowBudget: 80,
+    86→  maxDebateRounds: 3,
+    87→  fallbackOnError: true,
+    88→  telemetry: false,
+    89→};
+    90→
+    91→const AGENT_LABELS: Record<string, { name: string; color: string }> = {
+    92→  architect: { name: 'Architect', color: 'text-violet-400' },
+    93→  forge: { name: 'Forge', color: 'text-blue-400' },
+    94→  sentinel: { name: 'Sentinel', color: 'text-red-400' },
+    95→  perception: { name: 'Perception', color: 'text-amber-400' },
+    96→  scribe: { name: 'Scribe', color: 'text-green-400' },
+    97→};
+    98→
+    99→const BUDGET_THRESHOLDS = [50, 75, 90, 100];
+   100→
+   101→// -----------------------------------------------------------------------------
+   102→// Component
+   103→// -----------------------------------------------------------------------------
+   104→
+   105→export function SettingsPanel() {
+   106→  const { setTheme } = useTheme();
+   107→  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+   108→  const [loading, setLoading] = useState(true);
+   109→  const [saving, setSaving] = useState(false);
+   110→  const [saveFlash, setSaveFlash] = useState<string | null>(null);
+   111→  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   112→
+   113→  // ---------------------------------------------------------------------------
+   114→  // Fetch settings
+   115→  // ---------------------------------------------------------------------------
+   116→
+   117→  const fetchSettings = useCallback(async () => {
+   118→    setLoading(true);
+   119→    try {
+   120→      const res = await fetch('/api/settings');
+   121→      if (res.ok) {
+   122→        const data = await res.json();
+   123→        setSettings({ ...DEFAULT_SETTINGS, ...data });
+   124→      }
+   125→    } catch {
+   126→      // use defaults
+   127→    } finally {
+   128→      setLoading(false);
+   129→    }
+   130→  }, []);
+   131→
+   132→  useEffect(() => {
+   133→    fetchSettings();
+   134→  }, [fetchSettings]);
+   135→
+   136→  // ---------------------------------------------------------------------------
+   137→  // Save settings (debounced)
+   138→  // ---------------------------------------------------------------------------
+   139→
+   140→  const saveSettings = useCallback(async (newSettings: AppSettings) => {
+   141→    setSaving(true);
+   142→    try {
+   143→      const res = await fetch('/api/settings', {
+   144→        method: 'PATCH',
+   145→        headers: { 'Content-Type': 'application/json' },
+   146→        body: JSON.stringify(newSettings),
+   147→      });
+   148→      if (!res.ok) throw new Error('Save failed');
+   149→    } catch {
+   150→      toast.error('Failed to save settings');
+   151→    } finally {
+   152→      setSaving(false);
+   153→    }
+   154→  }, []);
+   155→
+   156→  const updateSetting = useCallback(
+   157→    <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+   158→      setSettings((prev) => {
+   159→        const updated = { ...prev, [key]: value };
+   160→        // Debounced save
+   161→        if (debounceRef.current) clearTimeout(debounceRef.current);
+   162→        debounceRef.current = setTimeout(() => {
+   163→          saveSettings(updated);
+   164→        }, 500);
+   165→        return updated;
+   166→      });
+   167→    },
+   168→    [saveSettings],
+   169→  );
+   170→
+   171→  const updateAgentBudget = useCallback(
+   172→    (agentId: string, value: number) => {
+   173→      setSettings((prev) => {
+   174→        const updated = {
+   175→          ...prev,
+   176→          agentBudgetLimits: { ...prev.agentBudgetLimits, [agentId]: value },
+   177→        };
+   178→        if (debounceRef.current) clearTimeout(debounceRef.current);
+   179→        debounceRef.current = setTimeout(() => {
+   180→          saveSettings(updated);
+   181→        }, 500);
+   182→        return updated;
+   183→      });
+   184→    },
+   185→    [saveSettings],
+   186→  );
+   187→
+   188→  const flashSave = useCallback((key: string) => {
+   189→    setSaveFlash(key);
+   190→    setTimeout(() => setSaveFlash(null), 1500);
+   191→  }, []);
+   192→
+   193→  const handleResetCosts = useCallback(() => {
+   194→    toast.success('Cost counters have been reset');
+   195→  }, []);
+   196→
+   197→  // ---------------------------------------------------------------------------
+   198→  // Render helpers
+   199→  // ---------------------------------------------------------------------------
+   200→
+   201→  const renderSaveIndicator = (key: string) => {
+   202→    if (saveFlash === key) {
+   203→      return (
+   204→        <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+   205→          <Check className="h-3 w-3" /> Saved
+   206→        </span>
+   207→      );
+   208→    }
+   209→    if (saving) {
+   210→      return (
+   211→        <span className="text-[10px] text-muted-foreground/70">Saving...</span>
+   212→      );
+   213→    }
+   214→    return null;
+   215→  };
+   216→
+   217→  // ---------------------------------------------------------------------------
+   218→  // Render
+   219→  // ---------------------------------------------------------------------------
+   220→
+   221→  return (
+   222→    <TooltipProvider>
+   223→      <div className="flex h-full flex-col min-h-0">
+   224→        {/* Header */}
+   225→        <div className="flex flex-col gap-1 border-b border-border/60 px-6 py-4">
+   226→          <div className="flex items-center justify-between">
+   227→            <div className="flex items-center gap-3">
+   228→              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600/15 border border-violet-500/20">
+   229→                <Settings className="h-4.5 w-4.5 text-violet-400" />
+   230→              </div>
+   231→              <div>
+   232→                <h1 className="text-base font-semibold text-foreground">Settings</h1>
+   233→                <p className="text-xs text-muted-foreground/70">Configure system preferences and orchestration parameters</p>
+   234→              </div>
+   235→            </div>
+   236→          </div>
+   237→        </div>
+   238→
+   239→        <ScrollArea className="flex-1 min-h-0">
+   240→          <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+   241→
+   242→            {/* General Settings */}
+   243→            <Card className="bg-card/80 border-border/60">
+   244→              <CardHeader className="pb-3">
+   245→                <CardTitle className="text-sm font-semibold text-secondary-foreground">General</CardTitle>
+   246→                <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   247→                  Appearance, language, and default behavior
+   248→                </CardDescription>
+   249→              </CardHeader>
+   250→              <CardContent className="space-y-5">
+   251→                {/* Theme */}
+   252→                <div className="flex items-center justify-between">
+   253→                  <div className="flex items-center gap-3">
+   254→                    <div className="flex h-8 w-8 items-center justify-center rounded-lg">
+   255→                      {settings.theme === 'dark' ? (
+   256→                        <Moon className="h-4 w-4 text-violet-400" />
+   257→                      ) : (
+   258→                        <Sun className="h-4 w-4 text-amber-400" />
+   259→                      )}
+   260→                    </div>
+   261→                    <div>
+   262→                      <Label className="text-xs text-secondary-foreground">Theme</Label>
+   263→                      <p className="text-[11px] text-muted-foreground/50">Switch between light and dark mode</p>
+   264→                    </div>
+   265→                  </div>
+   266→                  <Select
+   267→                    value={settings.theme}
+   268→                    onValueChange={(v) => {
+   269→                      const theme = v as 'dark' | 'light';
+   270→                      setTheme(theme);
+   271→                      updateSetting('theme', theme);
+   272→                    }}
+   273→                  >
+   274→                    <SelectTrigger className="w-32 h-8">
+   275→                      <SelectValue />
+   276→                    </SelectTrigger>
+   277→                    <SelectContent className="bg-popover border-border">
+   278→                      <SelectItem value="dark" className="text-secondary-foreground">
+   279→                        <div className="flex items-center gap-2"><Moon className="h-3 w-3" /> Dark</div>
+   280→                      </SelectItem>
+   281→                      <SelectItem value="light" className="text-secondary-foreground">
+   282→                        <div className="flex items-center gap-2"><Sun className="h-3 w-3" /> Light</div>
+   283→                      </SelectItem>
+   284→                    </SelectContent>
+   285→                  </Select>
+   286→                </div>
+   287→
+   288→                <Separator  />
+   289→
+   290→                {/* Language */}
+   291→                <div className="flex items-center justify-between">
+   292→                  <div>
+   293→                    <Label className="text-xs text-secondary-foreground">Language</Label>
+   294→                    <p className="text-[11px] text-muted-foreground/50">Interface language</p>
+   295→                  </div>
+   296→                  <Select
+   297→                    value={settings.language}
+   298→                    onValueChange={(v) => updateSetting('language', v)}
+   299→                  >
+   300→                    <SelectTrigger className="w-32 h-8">
+   301→                      <SelectValue />
+   302→                    </SelectTrigger>
+   303→                    <SelectContent className="bg-popover border-border">
+   304→                      <SelectItem value="en" className="text-secondary-foreground">English</SelectItem>
+   305→                    </SelectContent>
+   306→                  </Select>
+   307→                </div>
+   308→
+   309→                <Separator  />
+   310→
+   311→                {/* Default Debate Mode */}
+   312→                <div className="flex items-center justify-between">
+   313→                  <div>
+   314→                    <Label className="text-xs text-secondary-foreground">Default Debate Mode</Label>
+   315→                    <p className="text-[11px] text-muted-foreground/50">Orchestration mode for new sessions</p>
+   316→                  </div>
+   317→                  <Select
+   318→                    value={settings.defaultDebateMode}
+   319→                    onValueChange={(v) => updateSetting('defaultDebateMode', v as DebateMode)}
+   320→                  >
+   321→                    <SelectTrigger className="w-32 h-8">
+   322→                      <SelectValue />
+   323→                    </SelectTrigger>
+   324→                    <SelectContent className="bg-popover border-border">
+   325→                      <SelectItem value="fast" className="text-secondary-foreground">Fast</SelectItem>
+   326→                      <SelectItem value="council" className="text-secondary-foreground">Council</SelectItem>
+   327→                      <SelectItem value="redteam" className="text-secondary-foreground">Red Team</SelectItem>
+   328→                    </SelectContent>
+   329→                  </Select>
+   330→                </div>
+   331→
+   332→                <Separator  />
+   333→
+   334→                {/* Auto-save */}
+   335→                <div className="flex items-center justify-between">
+   336→                  <div>
+   337→                    <Label className="text-xs text-secondary-foreground">Auto-save</Label>
+   338→                    <p className="text-[11px] text-muted-foreground/50">Automatically save chat sessions</p>
+   339→                  </div>
+   340→                  <Switch
+   341→                    checked={settings.autoSave}
+   342→                    onCheckedChange={(v) => { updateSetting('autoSave', v); flashSave('autoSave'); }}
+   343→                    className="data-[state=checked]:bg-violet-600"
+   344→                  />
+   345→                </div>
+   346→              </CardContent>
+   347→            </Card>
+   348→
+   349→            {/* Cost Control */}
+   350→            <Card className="bg-card/80 border-border/60">
+   351→              <CardHeader className="pb-3">
+   352→                <div className="flex items-center justify-between">
+   353→                  <div>
+   354→                    <CardTitle className="text-sm font-semibold text-secondary-foreground">Cost Control</CardTitle>
+   355→                    <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   356→                      Budget limits and spending alerts
+   357→                    </CardDescription>
+   358→                  </div>
+   359→                  <Button
+   360→                    variant="outline"
+   361→                    size="sm"
+   362→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground border-input hover:"
+   363→                    onClick={handleResetCosts}
+   364→                  >
+   365→                    <RotateCcw className="h-3 w-3" />
+   366→                    Reset Counters
+   367→                  </Button>
+   368→                </div>
+   369→              </CardHeader>
+   370→              <CardContent className="space-y-5">
+   371→                {/* Per-session budget */}
+   372→                <div className="space-y-2">
+   373→                  <div className="flex items-center justify-between">
+   374→                    <Label className="text-xs text-secondary-foreground">Per-Session Budget Limit</Label>
+   375→                    {renderSaveIndicator('sessionBudget')}
+   376→                  </div>
+   377→                  <div className="flex items-center gap-2">
+   378→                    <span className="text-sm text-muted-foreground/70 font-medium">$</span>
+   379→                    <Input
+   380→                      type="number"
+   381→                      min={0}
+   382→                      step={1}
+   383→                      value={settings.sessionBudgetLimit}
+   384→                      onChange={(e) => updateSetting('sessionBudgetLimit', parseFloat(e.target.value) || 0)}
+   385→                      onBlur={() => flashSave('sessionBudget')}
+   386→                      className="h-8 w-24"
+   387→                    />
+   388→                    <span className="text-[11px] text-muted-foreground/50">per session</span>
+   389→                  </div>
+   390→                </div>
+   391→
+   392→                <Separator  />
+   393→
+   394→                {/* Per-agent budget limits */}
+   395→                <div className="space-y-3">
+   396→                  <Label className="text-xs text-secondary-foreground">Per-Agent Budget Limits</Label>
+   397→                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   398→                    {Object.entries(AGENT_LABELS).map(([agentId, { name, color }]) => (
+   399→                      <div key={agentId} className="flex items-center justify-between rounded-lg">
+   400→                        <span className={`text-xs font-medium ${color}`}>{name}</span>
+   401→                        <div className="flex items-center gap-1.5">
+   402→                          <span className="text-xs text-muted-foreground/70">$</span>
+   403→                          <Input
+   404→                            type="number"
+   405→                            min={0}
+   406→                            step={0.5}
+   407→                            value={settings.agentBudgetLimits[agentId] ?? 0}
+   408→                            onChange={(e) => updateAgentBudget(agentId, parseFloat(e.target.value) || 0)}
+   409→                            onBlur={() => flashSave(`agent-${agentId}`)}
+   410→                            className="h-7 w-16"
+   411→                          />
+   412→                        </div>
+   413→                      </div>
+   414→                    ))}
+   415→                  </div>
+   416→                </div>
+   417→
+   418→                <Separator  />
+   419→
+   420→                {/* Budget Alert Threshold */}
+   421→                <div className="space-y-2">
+   422→                  <div className="flex items-center justify-between">
+   423→                    <Label className="text-xs text-secondary-foreground">Budget Alert Threshold</Label>
+   424→                    <span className="text-xs font-mono text-violet-400">{settings.budgetAlertThreshold}%</span>
+   425→                  </div>
+   426→                  <Slider
+   427→                    value={[settings.budgetAlertThreshold]}
+   428→                    min={50}
+   429→                    max={100}
+   430→                    step={5}
+   431→                    onValueChange={([v]) => { updateSetting('budgetAlertThreshold', v); flashSave('threshold'); }}
+   432→                    className="py-1"
+   433→                  />
+   434→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   435→                    {BUDGET_THRESHOLDS.map((t) => (
+   436→                      <span key={t}>{t}%</span>
+   437→                    ))}
+   438→                  </div>
+   439→                </div>
+   440→              </CardContent>
+   441→            </Card>
+   442→
+   443→            {/* Security */}
+   444→            <Card className="bg-card/80 border-border/60">
+   445→              <CardHeader className="pb-3">
+   446→                <div className="flex items-center gap-2">
+   447→                  <Shield className="h-4 w-4 text-muted-foreground/70" />
+   448→                  <div>
+   449→                    <CardTitle className="text-sm font-semibold text-secondary-foreground">Security</CardTitle>
+   450→                    <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   451→                      Sandbox, tool approvals, and audit settings
+   452→                    </CardDescription>
+   453→                  </div>
+   454→                </div>
+   455→              </CardHeader>
+   456→              <CardContent className="space-y-5">
+   457→                {/* Sandbox Mode */}
+   458→                <div className="flex items-center justify-between">
+   459→                  <div>
+   460→                    <Label className="text-xs text-secondary-foreground">Sandbox Mode</Label>
+   461→                    <p className="text-[11px] text-muted-foreground/50">Isolate tool execution in a sandboxed environment</p>
+   462→                  </div>
+   463→                  <Switch
+   464→                    checked={settings.sandboxMode}
+   465→                    onCheckedChange={(v) => { updateSetting('sandboxMode', v); flashSave('sandbox'); }}
+   466→                    className="data-[state=checked]:bg-violet-600"
+   467→                  />
+   468→                </div>
+   469→
+   470→                <Separator  />
+   471→
+   472→                {/* Auto-approve Tools */}
+   473→                <div className="flex items-center justify-between">
+   474→                  <div>
+   475→                    <Label className="text-xs text-secondary-foreground">Auto-approve Tools</Label>
+   476→                    <p className="text-[11px] text-muted-foreground/50">Skip confirmation dialog before tool execution</p>
+   477→                  </div>
+   478→                  <Switch
+   479→                    checked={settings.autoApproveTools}
+   480→                    onCheckedChange={(v) => { updateSetting('autoApproveTools', v); flashSave('autoApprove'); }}
+   481→                    className="data-[state=checked]:bg-violet-600"
+   482→                  />
+   483→                </div>
+   484→
+   485→                <Separator  />
+   486→
+   487→                {/* Audit Logging */}
+   488→                <div className="flex items-center justify-between">
+   489→                  <div>
+   490→                    <Label className="text-xs text-secondary-foreground">Audit Logging</Label>
+   491→                    <p className="text-[11px] text-muted-foreground/50">Log all agent actions for compliance review</p>
+   492→                  </div>
+   493→                  <Switch
+   494→                    checked={settings.auditLogging}
+   495→                    onCheckedChange={(v) => { updateSetting('auditLogging', v); flashSave('audit'); }}
+   496→                    className="data-[state=checked]:bg-violet-600"
+   497→                  />
+   498→                </div>
+   499→
+   500→                <Separator  />
+   501→
+   502→                {/* Secret Storage */}
+   503→                <div className="flex items-center justify-between">
+   504→                  <div>
+   505→                    <Label className="text-xs text-secondary-foreground">Secret Storage</Label>
+   506→                    <p className="text-[11px] text-muted-foreground/50">Where API keys and credentials are stored</p>
+   507→                  </div>
+   508→                  <div className="flex items-center gap-2">
+   509→                    <span className="text-xs font-mono text-muted-foreground">
+   510→                      {settings.secretStorage}
+   511→                    </span>
+   512→                    <Badge
+   513→                      variant="outline"
+   514→                      className="text-[10px] h-4 px-1.5 border-emerald-700/30 bg-emerald-900/20 text-emerald-400"
+   515→                    >
+   516→                      Secure
+   517→                    </Badge>
+   518→                  </div>
+   519→                </div>
+   520→              </CardContent>
+   521→            </Card>
+   522→
+   523→            {/* Advanced */}
+   524→            <Card className="bg-card/80 border-border/60">
+   525→              <CardHeader className="pb-3">
+   526→                <CardTitle className="text-sm font-semibold text-secondary-foreground">Advanced</CardTitle>
+   527→                <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   528→                  Fine-tune orchestration behavior and system parameters
+   529→                </CardDescription>
+   530→              </CardHeader>
+   531→              <CardContent className="space-y-5">
+   532→                {/* Context Window Budget */}
+   533→                <div className="space-y-2">
+   534→                  <div className="flex items-center justify-between">
+   535→                    <Label className="text-xs text-secondary-foreground">Context Window Budget</Label>
+   536→                    <span className="text-xs font-mono text-violet-400">{settings.contextWindowBudget}%</span>
+   537→                  </div>
+   538→                  <Slider
+   539→                    value={[settings.contextWindowBudget]}
+   540→                    min={20}
+   541→                    max={100}
+   542→                    step={5}
+   543→                    onValueChange={([v]) => updateSetting('contextWindowBudget', v)}
+   544→                    className="py-1"
+   545→                  />
+   546→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   547→                    <span>20%</span>
+   548→                    <span>100%</span>
+   549→                  </div>
+   550→                </div>
+   551→
+   552→                <Separator  />
+   553→
+   554→                {/* Max Debate Rounds */}
+   555→                <div className="space-y-2">
+   556→                  <div className="flex items-center justify-between">
+   557→                    <Label className="text-xs text-secondary-foreground">Max Debate Rounds</Label>
+   558→                    <span className="text-xs font-mono text-violet-400">{settings.maxDebateRounds}</span>
+   559→                  </div>
+   560→                  <Slider
+   561→                    value={[settings.maxDebateRounds]}
+   562→                    min={1}
+   563→                    max={10}
+   564→                    step={1}
+   565→                    onValueChange={([v]) => updateSetting('maxDebateRounds', v)}
+   566→                    className="py-1"
+   567→                  />
+   568→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   569→                    <span>1</span>
+   570→                    <span>10</span>
+   571→                  </div>
+   572→                </div>
+   573→
+   574→                <Separator  />
+   575→
+   576→                {/* Fallback on Error */}
+   577→                <div className="flex items-center justify-between">
+   578→                  <div>
+   579→                    <Label className="text-xs text-secondary-foreground">Fallback on Error</Label>
+   580→                    <p className="text-[11px] text-muted-foreground/50">Use alternative provider if primary fails</p>
+   581→                  </div>
+   582→                  <Switch
+   583→                    checked={settings.fallbackOnError}
+   584→                    onCheckedChange={(v) => updateSetting('fallbackOnError', v)}
+   585→                    className="data-[state=checked]:bg-violet-600"
+   586→                  />
+   587→                </div>
+   588→
+   589→                <Separator  />
+   590→
+   591→                {/* Telemetry */}
+   592→                <div className="flex items-center justify-between">
+   593→                  <div>
+   594→                    <Label className="text-xs text-secondary-foreground">Telemetry</Label>
+   595→                    <p className="text-[11px] text-muted-foreground/50">Send anonymous usage data to improve NEXUS</p>
+   596→                  </div>
+   597→                  <Switch
+   598→                    checked={settings.telemetry}
+   599→                    onCheckedChange={(v) => updateSetting('telemetry', v)}
+   600→                    className="data-[state=checked]:bg-violet-600"
+   601→                  />
+   602→                </div>
+   603→              </CardContent>
+   604→            </Card>
+   605→
+   606→            {/* About */}
+   607→            <Card className="bg-card/80 border-border/60">
+   608→              <CardHeader className="pb-3">
+   609→                <CardTitle className="text-sm font-semibold text-secondary-foreground">About</CardTitle>
+   610→              </CardHeader>
+   611→              <CardContent className="space-y-4">
+   612→                <div className="flex items-center gap-3">
+   613→                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/15 border border-violet-500/20">
+   614→                    <span className="text-sm font-bold text-violet-400">N</span>
+   615→                  </div>
+   616→                  <div>
+   617→                    <p className="text-sm font-semibold text-secondary-foreground">NEXUS</p>
+   618→                    <p className="text-xs text-muted-foreground/70">Version 1.0.0</p>
+   619→                  </div>
+   620→                </div>
+   621→                <p className="text-xs text-muted-foreground/70 leading-relaxed">
+   622→                  Based on NEXUS Multi-Agent Orchestration Harness. A production-grade system for coordinating specialized LLM agents through structured debate and verification.
+   623→                </p>
+   624→                <div className="flex items-center gap-3 pt-1">
+   625→                  <Button
+   626→                    variant="ghost"
+   627→                    size="sm"
+   628→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground hover:"
+   629→                  >
+   630→                    <ExternalLink className="h-3 w-3" />
+   631→                    Documentation
+   632→                  </Button>
+   633→                  <Button
+   634→                    variant="ghost"
+   635→                    size="sm"
+   636→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground hover:"
+   637→                  >
+   638→                    <ExternalLink className="h-3 w-3" />
+   639→                    GitHub
+   640→                  </Button>
+   641→                  <Button
+   642→                    variant="ghost"
+   643→                    size="sm"
+   644→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground hover:"
+   645→                  >
+   646→                    <ExternalLink className="h-3 w-3" />
+   647→                    Discord
+   648→                  </Button>
+   649→                </div>
+   650→              </CardContent>
+   651→            </Card>
+   652→
+   653→          </div>
+   654→        </ScrollArea>
+   655→      </div>
+   656→    </TooltipProvider>
+   657→  );
+   658→}
+   659→

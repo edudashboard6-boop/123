@@ -1,0 +1,653 @@
+     1→'use client';
+     2→
+     3→import React, { useCallback, useEffect, useRef, useState } from 'react';
+     4→import { toast } from 'sonner';
+     5→import {
+     6→  Settings,
+     7→  Moon,
+     8→  Sun,
+     9→  DollarSign,
+    10→  AlertTriangle,
+    11→  Info,
+    12→  ExternalLink,
+    13→  ChevronRight,
+    14→  RotateCcw,
+    15→  Save,
+    16→  Check,
+    17→  Shield,
+    18→} from 'lucide-react';
+    19→
+    20→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    21→import { Button } from '@/components/ui/button';
+    22→import { Badge } from '@/components/ui/badge';
+    23→import { Label } from '@/components/ui/label';
+    24→import { Input } from '@/components/ui/input';
+    25→import { Slider } from '@/components/ui/slider';
+    26→import { Switch } from '@/components/ui/switch';
+    27→import { Separator } from '@/components/ui/separator';
+    28→import { ScrollArea } from '@/components/ui/scroll-area';
+    29→import {
+    30→  Select,
+    31→  SelectContent,
+    32→  SelectItem,
+    33→  SelectTrigger,
+    34→  SelectValue,
+    35→} from '@/components/ui/select';
+    36→import {
+    37→  Tooltip,
+    38→  TooltipContent,
+    39→  TooltipProvider,
+    40→  TooltipTrigger,
+    41→} from '@/components/ui/tooltip';
+    42→import type { DebateMode } from '@/lib/types';
+    43→
+    44→// -----------------------------------------------------------------------------
+    45→// Types
+    46→// -----------------------------------------------------------------------------
+    47→
+    48→interface AppSettings {
+    49→  theme: 'dark' | 'light';
+    50→  language: string;
+    51→  defaultDebateMode: DebateMode;
+    52→  autoSave: boolean;
+    53→  sessionBudgetLimit: number;
+    54→  agentBudgetLimits: Record<string, number>;
+    55→  budgetAlertThreshold: number;
+    56→  sandboxMode: boolean;
+    57→  autoApproveTools: boolean;
+    58→  auditLogging: boolean;
+    59→  secretStorage: string;
+    60→  contextWindowBudget: number;
+    61→  maxDebateRounds: number;
+    62→  fallbackOnError: boolean;
+    63→  telemetry: boolean;
+    64→}
+    65→
+    66→const DEFAULT_SETTINGS: AppSettings = {
+    67→  theme: 'dark',
+    68→  language: 'en',
+    69→  defaultDebateMode: 'fast',
+    70→  autoSave: true,
+    71→  sessionBudgetLimit: 10,
+    72→  agentBudgetLimits: {
+    73→    architect: 5,
+    74→    forge: 10,
+    75→    sentinel: 5,
+    76→    perception: 3,
+    77→    scribe: 3,
+    78→  },
+    79→  budgetAlertThreshold: 75,
+    80→  sandboxMode: true,
+    81→  autoApproveTools: false,
+    82→  auditLogging: true,
+    83→  secretStorage: 'OS Keychain',
+    84→  contextWindowBudget: 80,
+    85→  maxDebateRounds: 3,
+    86→  fallbackOnError: true,
+    87→  telemetry: false,
+    88→};
+    89→
+    90→const AGENT_LABELS: Record<string, { name: string; color: string }> = {
+    91→  architect: { name: 'Architect', color: 'text-violet-400' },
+    92→  forge: { name: 'Forge', color: 'text-blue-400' },
+    93→  sentinel: { name: 'Sentinel', color: 'text-red-400' },
+    94→  perception: { name: 'Perception', color: 'text-amber-400' },
+    95→  scribe: { name: 'Scribe', color: 'text-green-400' },
+    96→};
+    97→
+    98→const BUDGET_THRESHOLDS = [50, 75, 90, 100];
+    99→
+   100→// -----------------------------------------------------------------------------
+   101→// Component
+   102→// -----------------------------------------------------------------------------
+   103→
+   104→export function SettingsPanel() {
+   105→  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+   106→  const [loading, setLoading] = useState(true);
+   107→  const [saving, setSaving] = useState(false);
+   108→  const [saveFlash, setSaveFlash] = useState<string | null>(null);
+   109→  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   110→
+   111→  // ---------------------------------------------------------------------------
+   112→  // Fetch settings
+   113→  // ---------------------------------------------------------------------------
+   114→
+   115→  const fetchSettings = useCallback(async () => {
+   116→    setLoading(true);
+   117→    try {
+   118→      const res = await fetch('/api/settings');
+   119→      if (res.ok) {
+   120→        const data = await res.json();
+   121→        setSettings({ ...DEFAULT_SETTINGS, ...data });
+   122→      }
+   123→    } catch {
+   124→      // use defaults
+   125→    } finally {
+   126→      setLoading(false);
+   127→    }
+   128→  }, []);
+   129→
+   130→  useEffect(() => {
+   131→    fetchSettings();
+   132→  }, [fetchSettings]);
+   133→
+   134→  // ---------------------------------------------------------------------------
+   135→  // Save settings (debounced)
+   136→  // ---------------------------------------------------------------------------
+   137→
+   138→  const saveSettings = useCallback(async (newSettings: AppSettings) => {
+   139→    setSaving(true);
+   140→    try {
+   141→      const res = await fetch('/api/settings', {
+   142→        method: 'PATCH',
+   143→        headers: { 'Content-Type': 'application/json' },
+   144→        body: JSON.stringify(newSettings),
+   145→      });
+   146→      if (!res.ok) throw new Error('Save failed');
+   147→    } catch {
+   148→      toast.error('Failed to save settings');
+   149→    } finally {
+   150→      setSaving(false);
+   151→    }
+   152→  }, []);
+   153→
+   154→  const updateSetting = useCallback(
+   155→    <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+   156→      setSettings((prev) => {
+   157→        const updated = { ...prev, [key]: value };
+   158→        // Debounced save
+   159→        if (debounceRef.current) clearTimeout(debounceRef.current);
+   160→        debounceRef.current = setTimeout(() => {
+   161→          saveSettings(updated);
+   162→        }, 500);
+   163→        return updated;
+   164→      });
+   165→    },
+   166→    [saveSettings],
+   167→  );
+   168→
+   169→  const updateAgentBudget = useCallback(
+   170→    (agentId: string, value: number) => {
+   171→      setSettings((prev) => {
+   172→        const updated = {
+   173→          ...prev,
+   174→          agentBudgetLimits: { ...prev.agentBudgetLimits, [agentId]: value },
+   175→        };
+   176→        if (debounceRef.current) clearTimeout(debounceRef.current);
+   177→        debounceRef.current = setTimeout(() => {
+   178→          saveSettings(updated);
+   179→        }, 500);
+   180→        return updated;
+   181→      });
+   182→    },
+   183→    [saveSettings],
+   184→  );
+   185→
+   186→  const flashSave = useCallback((key: string) => {
+   187→    setSaveFlash(key);
+   188→    setTimeout(() => setSaveFlash(null), 1500);
+   189→  }, []);
+   190→
+   191→  const handleResetCosts = useCallback(() => {
+   192→    toast.success('Cost counters have been reset');
+   193→  }, []);
+   194→
+   195→  // ---------------------------------------------------------------------------
+   196→  // Render helpers
+   197→  // ---------------------------------------------------------------------------
+   198→
+   199→  const renderSaveIndicator = (key: string) => {
+   200→    if (saveFlash === key) {
+   201→      return (
+   202→        <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+   203→          <Check className="h-3 w-3" /> Saved
+   204→        </span>
+   205→      );
+   206→    }
+   207→    if (saving) {
+   208→      return (
+   209→        <span className="text-[10px] text-zinc-500">Saving...</span>
+   210→      );
+   211→    }
+   212→    return null;
+   213→  };
+   214→
+   215→  // ---------------------------------------------------------------------------
+   216→  // Render
+   217→  // ---------------------------------------------------------------------------
+   218→
+   219→  return (
+   220→    <TooltipProvider>
+   221→      <div className="flex h-full flex-col min-h-0">
+   222→        {/* Header */}
+   223→        <div className="flex flex-col gap-1 border-b border-zinc-800/60 px-6 py-4">
+   224→          <div className="flex items-center justify-between">
+   225→            <div className="flex items-center gap-3">
+   226→              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600/15 border border-violet-500/20">
+   227→                <Settings className="h-4.5 w-4.5 text-violet-400" />
+   228→              </div>
+   229→              <div>
+   230→                <h1 className="text-base font-semibold text-zinc-100">Settings</h1>
+   231→                <p className="text-xs text-zinc-500">Configure system preferences and orchestration parameters</p>
+   232→              </div>
+   233→            </div>
+   234→          </div>
+   235→        </div>
+   236→
+   237→        <ScrollArea className="flex-1 min-h-0">
+   238→          <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+   239→
+   240→            {/* General Settings */}
+   241→            <Card className="bg-zinc-900/80 border-zinc-800/60">
+   242→              <CardHeader className="pb-3">
+   243→                <CardTitle className="text-sm font-semibold text-zinc-200">General</CardTitle>
+   244→                <CardDescription className="text-xs text-zinc-500 mt-0.5">
+   245→                  Appearance, language, and default behavior
+   246→                </CardDescription>
+   247→              </CardHeader>
+   248→              <CardContent className="space-y-5">
+   249→                {/* Theme */}
+   250→                <div className="flex items-center justify-between">
+   251→                  <div className="flex items-center gap-3">
+   252→                    <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-800/60">
+   253→                      {settings.theme === 'dark' ? (
+   254→                        <Moon className="h-4 w-4 text-violet-400" />
+   255→                      ) : (
+   256→                        <Sun className="h-4 w-4 text-amber-400" />
+   257→                      )}
+   258→                    </div>
+   259→                    <div>
+   260→                      <Label className="text-xs text-zinc-300">Theme</Label>
+   261→                      <p className="text-[11px] text-zinc-600">Switch between light and dark mode</p>
+   262→                    </div>
+   263→                  </div>
+   264→                  <Select
+   265→                    value={settings.theme}
+   266→                    onValueChange={(v) => updateSetting('theme', v as 'dark' | 'light')}
+   267→                  >
+   268→                    <SelectTrigger className="w-32 h-8 bg-zinc-800/60 border-zinc-700/60 text-zinc-300 text-xs">
+   269→                      <SelectValue />
+   270→                    </SelectTrigger>
+   271→                    <SelectContent className="bg-zinc-900 border-zinc-800">
+   272→                      <SelectItem value="dark" className="text-zinc-300">
+   273→                        <div className="flex items-center gap-2"><Moon className="h-3 w-3" /> Dark</div>
+   274→                      </SelectItem>
+   275→                      <SelectItem value="light" className="text-zinc-300">
+   276→                        <div className="flex items-center gap-2"><Sun className="h-3 w-3" /> Light</div>
+   277→                      </SelectItem>
+   278→                    </SelectContent>
+   279→                  </Select>
+   280→                </div>
+   281→
+   282→                <Separator className="bg-zinc-800/60" />
+   283→
+   284→                {/* Language */}
+   285→                <div className="flex items-center justify-between">
+   286→                  <div>
+   287→                    <Label className="text-xs text-zinc-300">Language</Label>
+   288→                    <p className="text-[11px] text-zinc-600">Interface language</p>
+   289→                  </div>
+   290→                  <Select
+   291→                    value={settings.language}
+   292→                    onValueChange={(v) => updateSetting('language', v)}
+   293→                  >
+   294→                    <SelectTrigger className="w-32 h-8 bg-zinc-800/60 border-zinc-700/60 text-zinc-300 text-xs">
+   295→                      <SelectValue />
+   296→                    </SelectTrigger>
+   297→                    <SelectContent className="bg-zinc-900 border-zinc-800">
+   298→                      <SelectItem value="en" className="text-zinc-300">English</SelectItem>
+   299→                    </SelectContent>
+   300→                  </Select>
+   301→                </div>
+   302→
+   303→                <Separator className="bg-zinc-800/60" />
+   304→
+   305→                {/* Default Debate Mode */}
+   306→                <div className="flex items-center justify-between">
+   307→                  <div>
+   308→                    <Label className="text-xs text-zinc-300">Default Debate Mode</Label>
+   309→                    <p className="text-[11px] text-zinc-600">Orchestration mode for new sessions</p>
+   310→                  </div>
+   311→                  <Select
+   312→                    value={settings.defaultDebateMode}
+   313→                    onValueChange={(v) => updateSetting('defaultDebateMode', v as DebateMode)}
+   314→                  >
+   315→                    <SelectTrigger className="w-32 h-8 bg-zinc-800/60 border-zinc-700/60 text-zinc-300 text-xs">
+   316→                      <SelectValue />
+   317→                    </SelectTrigger>
+   318→                    <SelectContent className="bg-zinc-900 border-zinc-800">
+   319→                      <SelectItem value="fast" className="text-zinc-300">Fast</SelectItem>
+   320→                      <SelectItem value="council" className="text-zinc-300">Council</SelectItem>
+   321→                      <SelectItem value="redteam" className="text-zinc-300">Red Team</SelectItem>
+   322→                    </SelectContent>
+   323→                  </Select>
+   324→                </div>
+   325→
+   326→                <Separator className="bg-zinc-800/60" />
+   327→
+   328→                {/* Auto-save */}
+   329→                <div className="flex items-center justify-between">
+   330→                  <div>
+   331→                    <Label className="text-xs text-zinc-300">Auto-save</Label>
+   332→                    <p className="text-[11px] text-zinc-600">Automatically save chat sessions</p>
+   333→                  </div>
+   334→                  <Switch
+   335→                    checked={settings.autoSave}
+   336→                    onCheckedChange={(v) => { updateSetting('autoSave', v); flashSave('autoSave'); }}
+   337→                    className="data-[state=checked]:bg-violet-600"
+   338→                  />
+   339→                </div>
+   340→              </CardContent>
+   341→            </Card>
+   342→
+   343→            {/* Cost Control */}
+   344→            <Card className="bg-zinc-900/80 border-zinc-800/60">
+   345→              <CardHeader className="pb-3">
+   346→                <div className="flex items-center justify-between">
+   347→                  <div>
+   348→                    <CardTitle className="text-sm font-semibold text-zinc-200">Cost Control</CardTitle>
+   349→                    <CardDescription className="text-xs text-zinc-500 mt-0.5">
+   350→                      Budget limits and spending alerts
+   351→                    </CardDescription>
+   352→                  </div>
+   353→                  <Button
+   354→                    variant="outline"
+   355→                    size="sm"
+   356→                    className="h-7 text-[11px] text-zinc-400 hover:text-zinc-200 border-zinc-700 hover:bg-zinc-800 gap-1.5"
+   357→                    onClick={handleResetCosts}
+   358→                  >
+   359→                    <RotateCcw className="h-3 w-3" />
+   360→                    Reset Counters
+   361→                  </Button>
+   362→                </div>
+   363→              </CardHeader>
+   364→              <CardContent className="space-y-5">
+   365→                {/* Per-session budget */}
+   366→                <div className="space-y-2">
+   367→                  <div className="flex items-center justify-between">
+   368→                    <Label className="text-xs text-zinc-300">Per-Session Budget Limit</Label>
+   369→                    {renderSaveIndicator('sessionBudget')}
+   370→                  </div>
+   371→                  <div className="flex items-center gap-2">
+   372→                    <span className="text-sm text-zinc-500 font-medium">$</span>
+   373→                    <Input
+   374→                      type="number"
+   375→                      min={0}
+   376→                      step={1}
+   377→                      value={settings.sessionBudgetLimit}
+   378→                      onChange={(e) => updateSetting('sessionBudgetLimit', parseFloat(e.target.value) || 0)}
+   379→                      onBlur={() => flashSave('sessionBudget')}
+   380→                      className="h-8 w-24 bg-zinc-800/60 border-zinc-700/60 text-zinc-200 text-sm"
+   381→                    />
+   382→                    <span className="text-[11px] text-zinc-600">per session</span>
+   383→                  </div>
+   384→                </div>
+   385→
+   386→                <Separator className="bg-zinc-800/60" />
+   387→
+   388→                {/* Per-agent budget limits */}
+   389→                <div className="space-y-3">
+   390→                  <Label className="text-xs text-zinc-300">Per-Agent Budget Limits</Label>
+   391→                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   392→                    {Object.entries(AGENT_LABELS).map(([agentId, { name, color }]) => (
+   393→                      <div key={agentId} className="flex items-center justify-between rounded-lg bg-zinc-800/30 px-3 py-2">
+   394→                        <span className={`text-xs font-medium ${color}`}>{name}</span>
+   395→                        <div className="flex items-center gap-1.5">
+   396→                          <span className="text-xs text-zinc-500">$</span>
+   397→                          <Input
+   398→                            type="number"
+   399→                            min={0}
+   400→                            step={0.5}
+   401→                            value={settings.agentBudgetLimits[agentId] ?? 0}
+   402→                            onChange={(e) => updateAgentBudget(agentId, parseFloat(e.target.value) || 0)}
+   403→                            onBlur={() => flashSave(`agent-${agentId}`)}
+   404→                            className="h-7 w-16 bg-zinc-800/60 border-zinc-700/60 text-zinc-200 text-xs text-right"
+   405→                          />
+   406→                        </div>
+   407→                      </div>
+   408→                    ))}
+   409→                  </div>
+   410→                </div>
+   411→
+   412→                <Separator className="bg-zinc-800/60" />
+   413→
+   414→                {/* Budget Alert Threshold */}
+   415→                <div className="space-y-2">
+   416→                  <div className="flex items-center justify-between">
+   417→                    <Label className="text-xs text-zinc-300">Budget Alert Threshold</Label>
+   418→                    <span className="text-xs font-mono text-violet-400">{settings.budgetAlertThreshold}%</span>
+   419→                  </div>
+   420→                  <Slider
+   421→                    value={[settings.budgetAlertThreshold]}
+   422→                    min={50}
+   423→                    max={100}
+   424→                    step={5}
+   425→                    onValueChange={([v]) => { updateSetting('budgetAlertThreshold', v); flashSave('threshold'); }}
+   426→                    className="py-1"
+   427→                  />
+   428→                  <div className="flex justify-between text-[10px] text-zinc-600">
+   429→                    {BUDGET_THRESHOLDS.map((t) => (
+   430→                      <span key={t}>{t}%</span>
+   431→                    ))}
+   432→                  </div>
+   433→                </div>
+   434→              </CardContent>
+   435→            </Card>
+   436→
+   437→            {/* Security */}
+   438→            <Card className="bg-zinc-900/80 border-zinc-800/60">
+   439→              <CardHeader className="pb-3">
+   440→                <div className="flex items-center gap-2">
+   441→                  <Shield className="h-4 w-4 text-zinc-500" />
+   442→                  <div>
+   443→                    <CardTitle className="text-sm font-semibold text-zinc-200">Security</CardTitle>
+   444→                    <CardDescription className="text-xs text-zinc-500 mt-0.5">
+   445→                      Sandbox, tool approvals, and audit settings
+   446→                    </CardDescription>
+   447→                  </div>
+   448→                </div>
+   449→              </CardHeader>
+   450→              <CardContent className="space-y-5">
+   451→                {/* Sandbox Mode */}
+   452→                <div className="flex items-center justify-between">
+   453→                  <div>
+   454→                    <Label className="text-xs text-zinc-300">Sandbox Mode</Label>
+   455→                    <p className="text-[11px] text-zinc-600">Isolate tool execution in a sandboxed environment</p>
+   456→                  </div>
+   457→                  <Switch
+   458→                    checked={settings.sandboxMode}
+   459→                    onCheckedChange={(v) => { updateSetting('sandboxMode', v); flashSave('sandbox'); }}
+   460→                    className="data-[state=checked]:bg-violet-600"
+   461→                  />
+   462→                </div>
+   463→
+   464→                <Separator className="bg-zinc-800/60" />
+   465→
+   466→                {/* Auto-approve Tools */}
+   467→                <div className="flex items-center justify-between">
+   468→                  <div>
+   469→                    <Label className="text-xs text-zinc-300">Auto-approve Tools</Label>
+   470→                    <p className="text-[11px] text-zinc-600">Skip confirmation dialog before tool execution</p>
+   471→                  </div>
+   472→                  <Switch
+   473→                    checked={settings.autoApproveTools}
+   474→                    onCheckedChange={(v) => { updateSetting('autoApproveTools', v); flashSave('autoApprove'); }}
+   475→                    className="data-[state=checked]:bg-violet-600"
+   476→                  />
+   477→                </div>
+   478→
+   479→                <Separator className="bg-zinc-800/60" />
+   480→
+   481→                {/* Audit Logging */}
+   482→                <div className="flex items-center justify-between">
+   483→                  <div>
+   484→                    <Label className="text-xs text-zinc-300">Audit Logging</Label>
+   485→                    <p className="text-[11px] text-zinc-600">Log all agent actions for compliance review</p>
+   486→                  </div>
+   487→                  <Switch
+   488→                    checked={settings.auditLogging}
+   489→                    onCheckedChange={(v) => { updateSetting('auditLogging', v); flashSave('audit'); }}
+   490→                    className="data-[state=checked]:bg-violet-600"
+   491→                  />
+   492→                </div>
+   493→
+   494→                <Separator className="bg-zinc-800/60" />
+   495→
+   496→                {/* Secret Storage */}
+   497→                <div className="flex items-center justify-between">
+   498→                  <div>
+   499→                    <Label className="text-xs text-zinc-300">Secret Storage</Label>
+   500→                    <p className="text-[11px] text-zinc-600">Where API keys and credentials are stored</p>
+   501→                  </div>
+   502→                  <div className="flex items-center gap-2">
+   503→                    <span className="text-xs font-mono text-zinc-400 bg-zinc-800/60 px-2.5 py-1 rounded-md border border-zinc-700/40">
+   504→                      {settings.secretStorage}
+   505→                    </span>
+   506→                    <Badge
+   507→                      variant="outline"
+   508→                      className="text-[10px] h-4 px-1.5 border-emerald-700/30 bg-emerald-900/20 text-emerald-400"
+   509→                    >
+   510→                      Secure
+   511→                    </Badge>
+   512→                  </div>
+   513→                </div>
+   514→              </CardContent>
+   515→            </Card>
+   516→
+   517→            {/* Advanced */}
+   518→            <Card className="bg-zinc-900/80 border-zinc-800/60">
+   519→              <CardHeader className="pb-3">
+   520→                <CardTitle className="text-sm font-semibold text-zinc-200">Advanced</CardTitle>
+   521→                <CardDescription className="text-xs text-zinc-500 mt-0.5">
+   522→                  Fine-tune orchestration behavior and system parameters
+   523→                </CardDescription>
+   524→              </CardHeader>
+   525→              <CardContent className="space-y-5">
+   526→                {/* Context Window Budget */}
+   527→                <div className="space-y-2">
+   528→                  <div className="flex items-center justify-between">
+   529→                    <Label className="text-xs text-zinc-300">Context Window Budget</Label>
+   530→                    <span className="text-xs font-mono text-violet-400">{settings.contextWindowBudget}%</span>
+   531→                  </div>
+   532→                  <Slider
+   533→                    value={[settings.contextWindowBudget]}
+   534→                    min={20}
+   535→                    max={100}
+   536→                    step={5}
+   537→                    onValueChange={([v]) => updateSetting('contextWindowBudget', v)}
+   538→                    className="py-1"
+   539→                  />
+   540→                  <div className="flex justify-between text-[10px] text-zinc-600">
+   541→                    <span>20%</span>
+   542→                    <span>100%</span>
+   543→                  </div>
+   544→                </div>
+   545→
+   546→                <Separator className="bg-zinc-800/60" />
+   547→
+   548→                {/* Max Debate Rounds */}
+   549→                <div className="space-y-2">
+   550→                  <div className="flex items-center justify-between">
+   551→                    <Label className="text-xs text-zinc-300">Max Debate Rounds</Label>
+   552→                    <span className="text-xs font-mono text-violet-400">{settings.maxDebateRounds}</span>
+   553→                  </div>
+   554→                  <Slider
+   555→                    value={[settings.maxDebateRounds]}
+   556→                    min={1}
+   557→                    max={10}
+   558→                    step={1}
+   559→                    onValueChange={([v]) => updateSetting('maxDebateRounds', v)}
+   560→                    className="py-1"
+   561→                  />
+   562→                  <div className="flex justify-between text-[10px] text-zinc-600">
+   563→                    <span>1</span>
+   564→                    <span>10</span>
+   565→                  </div>
+   566→                </div>
+   567→
+   568→                <Separator className="bg-zinc-800/60" />
+   569→
+   570→                {/* Fallback on Error */}
+   571→                <div className="flex items-center justify-between">
+   572→                  <div>
+   573→                    <Label className="text-xs text-zinc-300">Fallback on Error</Label>
+   574→                    <p className="text-[11px] text-zinc-600">Use alternative provider if primary fails</p>
+   575→                  </div>
+   576→                  <Switch
+   577→                    checked={settings.fallbackOnError}
+   578→                    onCheckedChange={(v) => updateSetting('fallbackOnError', v)}
+   579→                    className="data-[state=checked]:bg-violet-600"
+   580→                  />
+   581→                </div>
+   582→
+   583→                <Separator className="bg-zinc-800/60" />
+   584→
+   585→                {/* Telemetry */}
+   586→                <div className="flex items-center justify-between">
+   587→                  <div>
+   588→                    <Label className="text-xs text-zinc-300">Telemetry</Label>
+   589→                    <p className="text-[11px] text-zinc-600">Send anonymous usage data to improve NEXUS</p>
+   590→                  </div>
+   591→                  <Switch
+   592→                    checked={settings.telemetry}
+   593→                    onCheckedChange={(v) => updateSetting('telemetry', v)}
+   594→                    className="data-[state=checked]:bg-violet-600"
+   595→                  />
+   596→                </div>
+   597→              </CardContent>
+   598→            </Card>
+   599→
+   600→            {/* About */}
+   601→            <Card className="bg-zinc-900/80 border-zinc-800/60">
+   602→              <CardHeader className="pb-3">
+   603→                <CardTitle className="text-sm font-semibold text-zinc-200">About</CardTitle>
+   604→              </CardHeader>
+   605→              <CardContent className="space-y-4">
+   606→                <div className="flex items-center gap-3">
+   607→                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/15 border border-violet-500/20">
+   608→                    <span className="text-sm font-bold text-violet-400">N</span>
+   609→                  </div>
+   610→                  <div>
+   611→                    <p className="text-sm font-semibold text-zinc-200">NEXUS</p>
+   612→                    <p className="text-xs text-zinc-500">Version 1.0.0</p>
+   613→                  </div>
+   614→                </div>
+   615→                <p className="text-xs text-zinc-500 leading-relaxed">
+   616→                  Based on NEXUS Multi-Agent Orchestration Harness. A production-grade system for coordinating specialized LLM agents through structured debate and verification.
+   617→                </p>
+   618→                <div className="flex items-center gap-3 pt-1">
+   619→                  <Button
+   620→                    variant="ghost"
+   621→                    size="sm"
+   622→                    className="h-7 text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 gap-1.5"
+   623→                  >
+   624→                    <ExternalLink className="h-3 w-3" />
+   625→                    Documentation
+   626→                  </Button>
+   627→                  <Button
+   628→                    variant="ghost"
+   629→                    size="sm"
+   630→                    className="h-7 text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 gap-1.5"
+   631→                  >
+   632→                    <ExternalLink className="h-3 w-3" />
+   633→                    GitHub
+   634→                  </Button>
+   635→                  <Button
+   636→                    variant="ghost"
+   637→                    size="sm"
+   638→                    className="h-7 text-[11px] text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 gap-1.5"
+   639→                  >
+   640→                    <ExternalLink className="h-3 w-3" />
+   641→                    Discord
+   642→                  </Button>
+   643→                </div>
+   644→              </CardContent>
+   645→            </Card>
+   646→
+   647→          </div>
+   648→        </ScrollArea>
+   649→      </div>
+   650→    </TooltipProvider>
+   651→  );
+   652→}
+   653→

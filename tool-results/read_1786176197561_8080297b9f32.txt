@@ -1,0 +1,1233 @@
+    50→  Globe,
+    51→  Paperclip,
+    52→  Database,
+    53→  Hexagon,
+    54→  Bot,
+    55→  Hammer,
+    56→  Shield,
+    57→  Eye,
+    58→  PenTool,
+    59→  Clock,
+    60→  Zap,
+    61→  AlertTriangle,
+    62→  AlertCircle,
+    63→  Info,
+    64→  CheckCircle,
+    65→  XCircle,
+    66→  ArrowRight,
+    67→  MessageSquare,
+    68→  Trash2,
+    69→  Edit,
+    70→  Search,
+    71→  RotateCcw,
+    72→  StopCircle,
+    73→  ChevronDown,
+    74→  ChevronRight,
+    75→  FileText,
+    76→  Wrench,
+    77→  Copy,
+    78→  Check,
+    79→} from 'lucide-react';
+    80→
+    81→// =============================================================================
+    82→// Constants & Mappings
+    83→// =============================================================================
+    84→
+    85→const AGENT_ICON_MAP: Record<AgentId, React.ElementType> = {
+    86→  architect: Bot,
+    87→  forge: Hammer,
+    88→  sentinel: Shield,
+    89→  perception: Eye,
+    90→  scribe: PenTool,
+    91→};
+    92→
+    93→const AGENT_COLOR_MAP: Record<AgentId, string> = {
+    94→  architect: 'bg-violet-500/20 text-violet-400 border-violet-500/40',
+    95→  forge: 'bg-blue-500/20 text-blue-400 border-blue-500/40',
+    96→  sentinel: 'bg-red-500/20 text-red-400 border-red-500/40',
+    97→  perception: 'bg-amber-500/20 text-amber-400 border-amber-500/40',
+    98→  scribe: 'bg-green-500/20 text-green-400 border-green-500/40',
+    99→};
+   100→
+   101→const AGENT_BORDER_COLOR_MAP: Record<AgentId, string> = {
+   102→  architect: 'border-l-violet-500',
+   103→  forge: 'border-l-blue-500',
+   104→  sentinel: 'border-l-red-500',
+   105→  perception: 'border-l-amber-500',
+   106→  scribe: 'border-l-green-500',
+   107→};
+   108→
+   109→const AGENT_AVATAR_BG: Record<AgentId, string> = {
+   110→  architect: 'bg-violet-600',
+   111→  forge: 'bg-blue-600',
+   112→  sentinel: 'bg-red-600',
+   113→  perception: 'bg-amber-600',
+   114→  scribe: 'bg-green-600',
+   115→};
+   116→
+   117→const MODE_STYLES: Record<DebateMode, string> = {
+   118→  fast: 'bg-muted text-secondary-foreground border-input',
+   119→  council: 'bg-violet-600/20 text-violet-300 border-violet-500/40',
+   120→  redteam: 'bg-red-600/20 text-red-300 border-red-500/40',
+   121→};
+   122→
+   123→const MODE_LABELS: Record<DebateMode, string> = {
+   124→  fast: 'Fast',
+   125→  council: 'Council',
+   126→  redteam: 'Red Team',
+   127→};
+   128→
+   129→const PHASE_ICONS: Record<DebatePhase, React.ElementType> = {
+   130→  draft: FileText,
+   131→  critique: AlertTriangle,
+   132→  rebuttal: RotateCcw,
+   133→  arbitrate: ScaleIcon,
+   134→  verify: CheckCircle,
+   135→  commit: Info,
+   136→};
+   137→
+   138→// Inline Scale icon since it's not in lucide
+   139→function ScaleIcon({ className }: { className?: string }) {
+   140→  return (
+   141→    <svg
+   142→      xmlns="http://www.w3.org/2000/svg"
+   143→      viewBox="0 0 24 24"
+   144→      fill="none"
+   145→      stroke="currentColor"
+   146→      strokeWidth="2"
+   147→      strokeLinecap="round"
+   148→      strokeLinejoin="round"
+   149→      className={className}
+   150→    >
+   151→      <path d="M16 16V4h2V2H6v2h2v12" />
+   152→      <path d="M12 22a4 4 0 0 0 4-4H8a4 4 0 0 0 4 4z" />
+   153→      <path d="M6 12H2v6h4" />
+   154→      <path d="M18 12h4v6h-4" />
+   155→    </svg>
+   156→  );
+   157→}
+   158→
+   159→const SEVERITY_STYLES: Record<DebateFinding['severity'], { bg: string; text: string; border: string; icon: React.ElementType }> = {
+   160→  critical: {
+   161→    bg: 'bg-red-500/10',
+   162→    text: 'text-red-400',
+   163→    border: 'border-red-500/30',
+   164→    icon: XCircle,
+   165→  },
+   166→  major: {
+   167→    bg: 'bg-orange-500/10',
+   168→    text: 'text-orange-400',
+   169→    border: 'border-orange-500/30',
+   170→    icon: AlertCircle,
+   171→  },
+   172→  minor: {
+   173→    bg: 'bg-yellow-500/10',
+   174→    text: 'text-yellow-400',
+   175→    border: 'border-yellow-500/30',
+   176→    icon: AlertTriangle,
+   177→  },
+   178→  suggestion: {
+   179→    bg: 'bg-primary/10',
+   180→    text: 'text-muted-foreground',
+   181→    border: 'border-border/30',
+   182→    icon: Info,
+   183→  },
+   184→};
+   185→
+   186→const SUGGESTIONS = [
+   187→  { text: 'Build a REST API with authentication', icon: Zap },
+   188→  { text: 'Review my code for security issues', icon: Shield },
+   189→  { text: 'Debug a performance bottleneck', icon: Wrench },
+   190→  { text: 'Generate API documentation', icon: FileText },
+   191→];
+   192→
+   193→const ALL_PHASES: DebatePhase[] = ['draft', 'critique', 'rebuttal', 'arbitrate', 'verify', 'commit'];
+   194→
+   195→// =============================================================================
+   196→// Helper: estimate tokens from text
+   197→// =============================================================================
+   198→function estimateTokens(text: string): number {
+   199→  return Math.ceil(text.length / 4);
+   200→}
+   201→
+   202→// =============================================================================
+   203→// Web Search Result Type
+   204→// =============================================================================
+   205→interface WebSearchResult {
+   206→  title: string;
+   207→  url: string;
+   208→  snippet: string;
+   209→}
+   210→
+   211→// =============================================================================
+   212→// Sub-components
+   213→// =============================================================================
+   214→
+   215→// ---------- Typing Indicator ----------
+   216→function TypingIndicator({ agentName }: { agentName: string }) {
+   217→  return (
+   218→    <motion.div
+   219→      initial={{ opacity: 0, y: 10 }}
+   220→      animate={{ opacity: 1, y: 0 }}
+   221→      exit={{ opacity: 0, y: -10 }}
+   222→      className="flex items-center gap-3 px-4 py-3"
+   223→    >
+   224→      <div className="flex items-center gap-2">
+   225→        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-600/20">
+   226→          <Bot className="h-3.5 w-3.5 text-violet-400" />
+   227→        </div>
+   228→        <span className="text-sm text-muted-foreground">{agentName}</span>
+   229→      </div>
+   230→      <div className="flex items-center gap-1">
+   231→        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:0ms]" />
+   232→        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:150ms]" />
+   233→        <span className="h-1.5 w-1.5 rounded-full bg-violet-400 animate-bounce [animation-delay:300ms]" />
+   234→      </div>
+   235→    </motion.div>
+   236→  );
+   237→}
+   238→
+   239→// ---------- Empty State ----------
+   240→function EmptyState({ onSuggestionClick }: { onSuggestionClick: (text: string) => void }) {
+   241→  return (
+   242→    <div className="flex h-full flex-col items-center justify-center gap-6 px-8">
+   243→      <motion.div
+   244→        initial={{ opacity: 0, scale: 0.8 }}
+   245→        animate={{ opacity: 1, scale: 1 }}
+   246→        transition={{ duration: 0.5, ease: 'easeOut' }}
+   247→        className="flex flex-col items-center gap-4"
+   248→      >
+   249→        <div className="relative">
+   250→          <div className="absolute inset-0 rounded-2xl bg-violet-500/20 blur-xl" />
+   251→          <div className="relative flex h-20 w-20 items-center justify-center rounded-2xl bg-violet-600/10 border border-violet-500/20">
+   252→            <Hexagon className="h-10 w-10 text-violet-400" />
+   253→          </div>
+   254→        </div>
+   255→        <div className="text-center">
+   256→          <h2 className="text-2xl font-bold text-foreground">Welcome to NEXUS</h2>
+   257→          <p className="mt-2 text-sm text-muted-foreground/70 max-w-sm">
+   258→            Your multi-agent orchestration system. Five specialized AI agents collaborating to deliver superior results.
+   259→          </p>
+   260→        </div>
+   261→      </motion.div>
+   262→
+   263→      <motion.div
+   264→        initial={{ opacity: 0, y: 20 }}
+   265→        animate={{ opacity: 1, y: 0 }}
+   266→        transition={{ duration: 0.5, delay: 0.2 }}
+   267→        className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-lg"
+   268→      >
+   269→        {SUGGESTIONS.map((suggestion) => (
+   270→          <button
+   271→            key={suggestion.text}
+   272→            onClick={() => onSuggestionClick(suggestion.text)}
+   273→            className="flex items-center gap-3 rounded-xl border border-border bg-card/50 p-4 text-left transition-all hover:border-violet-500/40 hover:bg-card group"
+   274→          >
+   275→            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted group-hover:bg-violet-600/10 transition-colors">
+   276→              <suggestion.icon className="h-4 w-4 text-muted-foreground/70 group-hover:text-violet-400 transition-colors" />
+   277→            </div>
+   278→            <span className="text-sm text-muted-foreground group-hover:text-secondary-foreground transition-colors">
+   279→              {suggestion.text}
+   280→            </span>
+   281→          </button>
+   282→        ))}
+   283→      </motion.div>
+   284→    </div>
+   285→  );
+   286→}
+   287→
+   288→// ---------- Tool Call Card ----------
+   289→function ToolCallCard({ toolCall }: { toolCall: ToolCall }) {
+   290→  const [copied, setCopied] = useState(false);
+   291→  const statusIcon =
+   292→    toolCall.status === 'success' ? (
+   293→      <CheckCircle className="h-3.5 w-3.5 text-green-400" />
+   294→    ) : toolCall.status === 'error' ? (
+   295→      <XCircle className="h-3.5 w-3.5 text-red-400" />
+   296→    ) : (
+   297→      <Clock className="h-3.5 w-3.5 text-muted-foreground/70" />
+   298→    );
+   299→
+   300→  const handleCopy = () => {
+   301→    navigator.clipboard.writeText(toolCall.result ?? JSON.stringify(toolCall.arguments, null, 2));
+   302→    setCopied(true);
+   303→    setTimeout(() => setCopied(false), 2000);
+   304→  };
+   305→
+   306→  return (
+   307→    <Collapsible className="my-2">
+   308→      <CollapsibleTrigger className="flex w-full items-center gap-2 rounded-lg border border-border bg-card/60 px-3 py-2 text-xs transition-colors hover:bg-muted/60 [&[data-state=open]>svg.chevron]:rotate-90">
+   309→        <ChevronRight className="h-3 w-3 text-muted-foreground/70 chevron transition-transform" />
+   310→        <Wrench className="h-3 w-3 text-violet-400" />
+   311→        <span className="font-medium text-secondary-foreground">{toolCall.name}</span>
+   312→        {statusIcon}
+   313→        {toolCall.duration != null && (
+   314→          <span className="ml-auto text-muted-foreground/50">{toolCall.duration}ms</span>
+   315→        )}
+   316→      </CollapsibleTrigger>
+   317→      <CollapsibleContent className="mt-1 space-y-2 pl-6">
+   318→        <div className="rounded-lg border border-border bg-card/40 p-3">
+   319→          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50 mb-1">Arguments</p>
+   320→          <pre className="text-xs text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all">
+   321→            {JSON.stringify(toolCall.arguments, null, 2)}
+   322→          </pre>
+   323→        </div>
+   324→        {toolCall.result && (
+   325→          <div className="rounded-lg border border-border bg-card/40 p-3">
+   326→            <div className="flex items-center justify-between mb-1">
+   327→              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Result</p>
+   328→              <button
+   329→                onClick={handleCopy}
+   330→                className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+   331→              >
+   332→                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+   333→              </button>
+   334→            </div>
+   335→            <pre className="text-xs text-muted-foreground overflow-x-auto whitespace-pre-wrap break-all max-h-48">
+   336→              {toolCall.result}
+   337→            </pre>
+   338→          </div>
+   339→        )}
+   340→      </CollapsibleContent>
+   341→    </Collapsible>
+   342→  );
+   343→}
+   344→
+   345→// ---------- Debate Findings ----------
+   346→function DebateFindings({ findings }: { findings: DebateFinding[] }) {
+   347→  return (
+   348→    <div className="mt-3 space-y-2">
+   349→      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Findings</p>
+   350→      {findings.map((finding, i) => {
+   351→        const style = SEVERITY_STYLES[finding.severity];
+   352→        const Icon = style.icon;
+   353→        return (
+   354→          <div
+   355→            key={i}
+   356→            className={`rounded-lg border ${style.border} ${style.bg} p-3`}
+   357→          >
+   358→            <div className="flex items-start gap-2">
+   359→              <Icon className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${style.text}`} />
+   360→              <div className="flex-1 min-w-0">
+   361→                <div className="flex items-center gap-2 mb-1">
+   362→                  <span className={`text-[10px] font-bold uppercase tracking-wider ${style.text}`}>
+   363→                    {finding.severity}
+   364→                  </span>
+   365→                  {finding.location && (
+   366→                    <span className="text-[10px] text-muted-foreground/70 truncate">{finding.location}</span>
+   367→                  )}
+   368→                </div>
+   369→                <p className="text-xs text-secondary-foreground leading-relaxed">{finding.description}</p>
+   370→                {finding.remediation && (
+   371→                  <p className="text-xs text-muted-foreground/70 mt-1 leading-relaxed">
+   372→                    <span className="font-medium">Fix:</span> {finding.remediation}
+   373→                  </p>
+   374→                )}
+   375→              </div>
+   376→            </div>
+   377→          </div>
+   378→        );
+   379→      })}
+   380→    </div>
+   381→  );
+   382→}
+   383→
+   384→// ---------- Markdown Renderer ----------
+   385→function MarkdownRenderer({ content }: { content: string }) {
+   386→  return (
+   387→    <ReactMarkdown
+   388→      components={{
+   389→        code({ className, children, ...props }) {
+   390→          const match = /language-(\w+)/.exec(className || '');
+   391→          const isInline = !match;
+   392→          return isInline ? (
+   393→            <code
+   394→              className="rounded bg-muted px-1.5 py-0.5 text-xs text-violet-300 font-mono"
+   395→              {...props}
+   396→            >
+   397→              {children}
+   398→            </code>
+   399→          ) : (
+   400→            <div className="relative my-2 rounded-lg border border-border overflow-hidden">
+   401→              <div className="flex items-center justify-between border-b border-border bg-card/80 px-4 py-1.5">
+   402→                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/70">
+   403→                  {match[1]}
+   404→                </span>
+   405→              </div>
+   406→              <SyntaxHighlighter
+   407→                style={oneDark}
+   408→                language={match[1]}
+   409→                PreTag="div"
+   410→                customStyle={{
+   411→                  margin: 0,
+   412→                  padding: '1rem',
+   413→                  background: 'transparent',
+   414→                  fontSize: '0.75rem',
+   415→                  lineHeight: '1.5',
+   416→                }}
+   417→              >
+   418→                {String(children).replace(/\n$/, '')}
+   419→              </SyntaxHighlighter>
+   420→            </div>
+   421→          );
+   422→        },
+   423→        p({ children }) {
+   424→          return <p className="text-sm text-secondary-foreground leading-relaxed mb-2 last:mb-0">{children}</p>;
+   425→        },
+   426→        ul({ children }) {
+   427→          return <ul className="text-sm text-secondary-foreground list-disc list-inside mb-2 space-y-0.5">{children}</ul>;
+   428→        },
+   429→        ol({ children }) {
+   430→          return <ol className="text-sm text-secondary-foreground list-decimal list-inside mb-2 space-y-0.5">{children}</ol>;
+   431→        },
+   432→        li({ children }) {
+   433→          return <li className="leading-relaxed">{children}</li>;
+   434→        },
+   435→        h1({ children }) {
+   436→          return <h1 className="text-lg font-bold text-foreground mb-2 mt-4">{children}</h1>;
+   437→        },
+   438→        h2({ children }) {
+   439→          return <h2 className="text-base font-bold text-foreground mb-2 mt-3">{children}</h2>;
+   440→        },
+   441→        h3({ children }) {
+   442→          return <h3 className="text-sm font-semibold text-secondary-foreground mb-1 mt-2">{children}</h3>;
+   443→        },
+   444→        blockquote({ children }) {
+   445→          return (
+   446→            <blockquote className="border-l-2 border-violet-500/40 pl-3 my-2 text-muted-foreground italic">
+   447→              {children}
+   448→            </blockquote>
+   449→          );
+   450→        },
+   451→        a({ href, children }) {
+   452→          return (
+   453→            <a href={href} className="text-violet-400 hover:text-violet-300 underline underline-offset-2" target="_blank" rel="noopener noreferrer">
+   454→              {children}
+   455→            </a>
+   456→          );
+   457→        },
+   458→        table({ children }) {
+   459→          return (
+   460→            <div className="my-2 overflow-x-auto rounded-lg border border-border">
+   461→              <table className="w-full text-xs">{children}</table>
+   462→            </div>
+   463→          );
+   464→        },
+   465→        th({ children }) {
+   466→          return <th className="border-b border-border bg-card/60 px-3 py-2 text-left font-medium text-secondary-foreground">{children}</th>;
+   467→        },
+   468→        td({ children }) {
+   469→          return <td className="border-b border-border/50 px-3 py-2 text-muted-foreground">{children}</td>;
+   470→        },
+   471→        hr() {
+   472→          return <hr className="my-3 border-border" />;
+   473→        },
+   474→        strong({ children }) {
+   475→          return <strong className="font-semibold text-foreground">{children}</strong>;
+   476→        },
+   477→      }}
+   478→    >
+   479→      {content}
+   480→    </ReactMarkdown>
+   481→  );
+   482→}
+   483→
+   484→// ---------- Message Bubble ----------
+   485→function MessageBubble({ message }: { message: ChatMessage }) {
+   486→  const isUser = message.role === 'user';
+   487→  const isSystem = message.role === 'system';
+   488→  const isAgent = !isUser && !isSystem;
+   489→  const agentId = message.role as AgentId;
+   490→  const AgentIcon = isAgent ? AGENT_ICON_MAP[agentId] : null;
+   491→  const hasToolCalls = message.toolCalls && message.toolCalls.length > 0;
+   492→  const hasDebateData = !!message.debateData;
+   493→
+   494→  // System message
+   495→  if (isSystem) {
+   496→    return (
+   497→      <motion.div
+   498→        initial={{ opacity: 0, y: 10 }}
+   499→        animate={{ opacity: 1, y: 0 }}
+   500→        className="flex justify-center py-2"
+   501→      >
+   502→        <span className="text-xs text-muted-foreground/70 bg-card/60 rounded-full px-3 py-1">
+   503→          {message.content}
+   504→        </span>
+   505→      </motion.div>
+   506→    );
+   507→  }
+   508→
+   509→  // User message
+   510→  if (isUser) {
+   511→    return (
+   512→      <motion.div
+   513→        initial={{ opacity: 0, y: 10 }}
+   514→        animate={{ opacity: 1, y: 0 }}
+   515→        className="flex justify-end px-4 py-1.5"
+   516→      >
+   517→        <div className="max-w-[75%] rounded-2xl rounded-tr-md bg-muted px-4 py-3">
+   518→          <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+   519→            {message.content}
+   520→          </p>
+   521→        </div>
+   522→      </motion.div>
+   523→    );
+   524→  }
+   525→
+   526→  // Agent message
+   527→  return (
+   528→    <motion.div
+   529→      initial={{ opacity: 0, y: 10 }}
+   530→      animate={{ opacity: 1, y: 0 }}
+   531→      className="flex gap-3 px-4 py-1.5"
+   532→    >
+   533→      <div className="flex shrink-0 flex-col items-center gap-1">
+   534→        <Avatar className="h-8 w-8 border border-border">
+   535→          <AvatarFallback className={`${AGENT_AVATAR_BG[agentId]} text-white text-xs font-bold`}>
+   536→            <AgentIcon className="h-4 w-4" />
+   537→          </AvatarFallback>
+   538→        </Avatar>
+   539→      </div>
+   540→
+   541→      <div className={`flex-1 min-w-0 border-l-2 ${AGENT_BORDER_COLOR_MAP[agentId]} pl-3`}>
+   542→        {/* Header row */}
+   543→        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+   544→          <span className="text-sm font-semibold text-secondary-foreground">{message.agentName}</span>
+   545→          {message.modelUsed && (
+   546→            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-input text-muted-foreground/70">
+   547→              {message.modelUsed}
+   548→            </Badge>
+   549→          )}
+   550→          {hasDebateData && message.debateData && (
+   551→            <Badge className={`text-[10px] px-1.5 py-0 h-4 border ${MODE_STYLES.council}`}>
+   552→              {message.debateData.phase.toUpperCase()}
+   553→            </Badge>
+   554→          )}
+   555→          <span className="text-[10px] text-muted-foreground/50 ml-auto">
+   556→            {formatDistanceToNow(new Date(message.createdAt), { addSuffix: true })}
+   557→          </span>
+   558→        </div>
+   559→
+   560→        {/* Message content */}
+   561→        <div className="text-secondary-foreground">
+   562→          <MarkdownRenderer content={message.content} />
+   563→        </div>
+   564→
+   565→        {/* Debate findings */}
+   566→        {hasDebateData && message.debateData?.findings && message.debateData.findings.length > 0 && (
+   567→          <DebateFindings findings={message.debateData.findings} />
+   568→        )}
+   569→
+   570→        {/* Verdict */}
+   571→        {hasDebateData && message.debateData?.verdict && (
+   572→          <div className="mt-2 rounded-lg border border-violet-500/30 bg-violet-500/5 p-3">
+   573→            <p className="text-[10px] font-medium uppercase tracking-wider text-violet-400 mb-1">Verdict</p>
+   574→            <p className="text-xs text-secondary-foreground leading-relaxed">{message.debateData.verdict}</p>
+   575→          </div>
+   576→        )}
+   577→
+   578→        {/* Tool calls */}
+   579→        {hasToolCalls && message.toolCalls.map((tc) => <ToolCallCard key={tc.id} toolCall={tc} />)}
+   580→
+   581→        {/* Token count footer */}
+   582→        {message.tokens > 0 && (
+   583→          <div className="flex items-center gap-3 mt-2 text-[10px] text-muted-foreground/50">
+   584→            <span className="flex items-center gap-1">
+   585→              <Zap className="h-3 w-3" /> {message.tokens} tokens
+   586→            </span>
+   587→            {message.cost > 0 && (
+   588→              <span>${message.cost.toFixed(4)}</span>
+   589→            )}
+   590→          </div>
+   591→        )}
+   592→      </div>
+   593→    </motion.div>
+   594→  );
+   595→}
+   596→
+   597→// ---------- Debate Timeline ----------
+   598→function DebateTimeline({
+   599→  currentPhase,
+   600→  messages,
+   601→}: {
+   602→  currentPhase?: DebatePhase;
+   603→  messages: ChatMessage[];
+   604→}) {
+   605→  const phaseOrder: DebatePhase[] = ['draft', 'critique', 'rebuttal', 'arbitrate', 'verify', 'commit'];
+   606→
+   607→  // Determine which phases have been reached based on messages
+   608→  const reachedPhases = new Set<DebatePhase>();
+   609→  messages.forEach((m) => {
+   610→    if (m.debateData) {
+   611→      reachedPhases.add(m.debateData.phase);
+   612→    }
+   613→  });
+   614→
+   615→  const currentIndex = currentPhase ? phaseOrder.indexOf(currentPhase) : -1;
+   616→
+   617→  return (
+   618→    <div className="space-y-1">
+   619→      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50 mb-2">Debate Timeline</p>
+   620→      <div className="space-y-0">
+   621→        {phaseOrder.map((phase, idx) => {
+   622→          const phaseDef = DEBATE_PHASES.find((p) => p.phase === phase);
+   623→          const isCompleted = reachedPhases.has(phase) && idx < currentIndex;
+   624→          const isActive = phase === currentPhase;
+   625→          const isPending = !reachedPhases.has(phase) && idx > currentIndex;
+   626→          const Icon = PHASE_ICONS[phase];
+   627→
+   628→          return (
+   629→            <div key={phase} className="flex items-start gap-2.5">
+   630→              {/* Vertical line + node */}
+   631→              <div className="flex flex-col items-center">
+   632→                <div
+   633→                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
+   634→                    isCompleted
+   635→                      ? 'border-violet-500 bg-violet-500/20 text-violet-400'
+   636→                      : isActive
+   637→                        ? 'border-violet-400 bg-violet-500/10 text-violet-300 animate-pulse'
+   638→                        : 'border-input bg-muted text-muted-foreground/50'
+   639→                  }`}
+   640→                >
+   641→                  {isCompleted ? (
+   642→                    <CheckCircle className="h-3.5 w-3.5" />
+   643→                  ) : (
+   644→                    <Icon className="h-3.5 w-3.5" />
+   645→                  )}
+   646→                </div>
+   647→                {idx < phaseOrder.length - 1 && (
+   648→                  <div
+   649→                    className={`w-px h-5 ${
+   650→                      isCompleted ? 'bg-violet-500/40' : 'bg-muted'
+   651→                    }`}
+   652→                  />
+   653→                )}
+   654→              </div>
+   655→              {/* Label */}
+   656→              <div className="pt-1">
+   657→                <p
+   658→                  className={`text-xs font-medium ${
+   659→                    isCompleted || isActive ? 'text-secondary-foreground' : 'text-muted-foreground/50'
+   660→                  }`}
+   661→                >
+   662→                  {phaseDef?.label ?? phase}
+   663→                </p>
+   664→                {isActive && (
+   665→                  <p className="text-[10px] text-muted-foreground/70">{phaseDef?.description}</p>
+   666→                )}
+   667→              </div>
+   668→            </div>
+   669→          );
+   670→        })}
+   671→      </div>
+   672→    </div>
+   673→  );
+   674→}
+   675→
+   676→// ---------- Cost Breakdown ----------
+   677→function CostBreakdown({ messages }: { messages: ChatMessage[] }) {
+   678→  const agentMap = new Map<string, { tokens: number; cost: number; calls: number }>();
+   679→
+   680→  messages.forEach((m) => {
+   681→    if (m.role === 'system' || m.role === 'user') return;
+   682→    const existing = agentMap.get(m.agentName) ?? { tokens: 0, cost: 0, calls: 0 };
+   683→    agentMap.set(m.agentName, {
+   684→      tokens: existing.tokens + m.tokens,
+   685→      cost: existing.cost + m.cost,
+   686→      calls: existing.calls + 1,
+   687→    });
+   688→  });
+   689→
+   690→  const entries = Array.from(agentMap.entries());
+   691→  if (entries.length === 0) return null;
+   692→
+   693→  const maxTokens = Math.max(...entries.map(([, v]) => v.tokens), 1);
+   694→
+   695→  return (
+   696→    <div className="space-y-2">
+   697→      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Cost Breakdown</p>
+   698→      <div className="space-y-2.5">
+   699→        {entries.map(([name, data]) => {
+   700→          const agentDef = DEFAULT_AGENTS.find((a) => a.name === name);
+   701→          const pct = (data.tokens / maxTokens) * 100;
+   702→          return (
+   703→            <div key={name} className="space-y-1">
+   704→              <div className="flex items-center justify-between">
+   705→                <div className="flex items-center gap-2">
+   706→                  <div
+   707→                    className={`h-2 w-2 rounded-full ${
+   708→                      agentDef ? agentDef.color.replace('text-', 'bg-') : 'bg-accent'
+   709→                    }`}
+   710→                  />
+   711→                  <span className="text-xs text-secondary-foreground">{name}</span>
+   712→                </div>
+   713→                <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
+   714→                  <span>{data.tokens.toLocaleString()} tok</span>
+   715→                  <span>${data.cost.toFixed(4)}</span>
+   716→                </div>
+   717→              </div>
+   718→              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+   719→                <div
+   720→                  className={`h-full rounded-full transition-all ${
+   721→                    agentDef ? agentDef.color.replace('text-', 'bg-') : 'bg-accent'
+   722→                  }`}
+   723→                  style={{ width: `${pct}%` }}
+   724→                />
+   725→              </div>
+   726→            </div>
+   727→          );
+   728→        })}
+   729→      </div>
+   730→    </div>
+   731→  );
+   732→}
+   733→
+   734→// ---------- Right Panel Content ----------
+   735→function RightPanelContent({
+   736→  messages,
+   737→  session,
+   738→  searchResults,
+   739→}: {
+   740→  messages: ChatMessage[];
+   741→  session: ChatSession | null;
+   742→  searchResults: WebSearchResult[];
+   743→}) {
+   744→  const mode = session?.mode ?? 'fast';
+   745→  const isDebateMode = mode !== 'fast';
+   746→
+   747→  // Get active agents from messages
+   748→  const activeAgents = new Set<AgentId>();
+   749→  messages.forEach((m) => {
+   750→    if (m.role !== 'user' && m.role !== 'system') {
+   751→      activeAgents.add(m.role as AgentId);
+   752→    }
+   753→  });
+   754→
+   755→  // Get current debate phase
+   756→  const lastDebateMsg = [...messages].reverse().find((m) => m.debateData);
+   757→  const currentPhase = lastDebateMsg?.debateData?.phase;
+   758→
+   759→  return (
+   760→    <ScrollArea className="h-full">
+   761→      <div className="space-y-5 p-4">
+   762→        {/* Session Info */}
+   763→        {session && (
+   764→          <div className="space-y-2.5">
+   765→            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Session Info</p>
+   766→            <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+   767→              <div className="flex items-center justify-between">
+   768→                <span className="text-xs text-muted-foreground/70">Mode</span>
+   769→                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 border ${MODE_STYLES[mode]}`}>
+   770→                  {MODE_LABELS[mode]}
+   771→                </Badge>
+   772→              </div>
+   773→              <div className="flex items-center justify-between">
+   774→                <span className="text-xs text-muted-foreground/70">Created</span>
+   775→                <span className="text-xs text-muted-foreground">
+   776→                  {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
+   777→                </span>
+   778→              </div>
+   779→              <div className="flex items-center justify-between">
+   780→                <span className="text-xs text-muted-foreground/70">Messages</span>
+   781→                <span className="text-xs text-muted-foreground">{messages.length}</span>
+   782→              </div>
+   783→            </div>
+   784→          </div>
+   785→        )}
+   786→
+   787→        <Separator  />
+   788→
+   789→        {/* Active Agents */}
+   790→        <div className="space-y-2.5">
+   791→          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Active Agents</p>
+   792→          <div className="space-y-1.5">
+   793→            {DEFAULT_AGENTS.map((agent) => {
+   794→              const isActive = activeAgents.has(agent.agentId);
+   795→              const Icon = AGENT_ICON_MAP[agent.agentId];
+   796→              return (
+   797→                <div
+   798→                  key={agent.agentId}
+   799→                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors ${
+   800→                    isActive ? 'bg-card/60 border border-border' : 'opacity-40'
+   801→                  }`}
+   802→                >
+   803→                  <div
+   804→                    className={`flex h-6 w-6 items-center justify-center rounded-full ${
+   805→                      isActive ? agent.color.replace('text-', 'bg-').replace('-500', '-600') + '/20' : 'bg-muted'
+   806→                    }`}
+   807→                  >
+   808→                    <Icon className={`h-3 w-3 ${isActive ? agent.color : 'text-muted-foreground/50'}`} />
+   809→                  </div>
+   810→                  <span className={`text-xs ${isActive ? 'text-secondary-foreground' : 'text-muted-foreground/50'}`}>
+   811→                    {agent.name}
+   812→                  </span>
+   813→                  {isActive && (
+   814→                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-green-400" />
+   815→                  )}
+   816→                </div>
+   817→              );
+   818→            })}
+   819→          </div>
+   820→        </div>
+   821→
+   822→        {/* Debate Timeline */}
+   823→        {isDebateMode && (
+   824→          <>
+   825→            <Separator  />
+   826→            <DebateTimeline currentPhase={currentPhase} messages={messages} />
+   827→          </>
+   828→        )}
+   829→
+   830→        {/* Cost Breakdown */}
+   831→        <>
+   832→          <Separator  />
+   833→          <CostBreakdown messages={messages} />
+   834→        </>
+   835→
+   836→        {/* Web Search Results */}
+   837→        {searchResults.length > 0 && (
+   838→          <>
+   839→            <Separator  />
+   840→            <div className="space-y-2.5">
+   841→              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Search Results</p>
+   842→              <div className="space-y-2 max-h-64 overflow-y-auto">
+   843→                {searchResults.map((result, i) => (
+   844→                  <a
+   845→                    key={i}
+   846→                    href={result.url}
+   847→                    target="_blank"
+   848→                    rel="noopener noreferrer"
+   849→                    className="block rounded-lg border border-border bg-card/40 p-3 transition-colors hover:border-input hover:bg-card/60"
+   850→                  >
+   851→                    <p className="text-xs font-medium text-violet-400 mb-1 line-clamp-1">
+   852→                      {result.title}
+   853→                    </p>
+   854→                    <p className="text-[10px] text-muted-foreground/70 line-clamp-2 leading-relaxed">
+   855→                      {result.snippet}
+   856→                    </p>
+   857→                    <p className="text-[10px] text-muted-foreground/50 mt-1.5 truncate">
+   858→                      {result.url}
+   859→                    </p>
+   860→                  </a>
+   861→                ))}
+   862→              </div>
+   863→            </div>
+   864→          </>
+   865→        )}
+   866→      </div>
+   867→    </ScrollArea>
+   868→  );
+   869→}
+   870→
+   871→// =============================================================================
+   872→// Main ChatPanel
+   873→// =============================================================================
+   874→
+   875→export function ChatPanel() {
+   876→  const {
+   877→    messages,
+   878→    sessions,
+   879→    activeSessionId,
+   880→    loading,
+   881→    error,
+   882→    totalTokens,
+   883→    totalCost,
+   884→    sendMessage,
+   885→    createSession,
+   886→    deleteSession,
+   887→    loadSessionMessages,
+   888→    clearMessages,
+   889→  } = useChatStore();
+   890→
+   891→  const { isProcessing, setIsProcessing, debateMode, activeSessionId: uiSessionId } = useUiStore();
+   892→
+   893→  const [input, setInput] = useState('');
+   894→  const [isEditingTitle, setIsEditingTitle] = useState(false);
+   895→  const [editTitle, setEditTitle] = useState('');
+   896→  const [showWebSearch, setShowWebSearch] = useState(false);
+   897→  const [searchQuery, setSearchQuery] = useState('');
+   898→  const [searchResults, setSearchResults] = useState<WebSearchResult[]>([]);
+   899→  const [searching, setSearching] = useState(false);
+   900→
+   901→  const messagesEndRef = useRef<HTMLDivElement>(null);
+   902→  const textareaRef = useRef<HTMLTextAreaElement>(null);
+   903→
+   904→  // Derived state
+   905→  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+   906→  const effectiveSessionId = activeSessionId;
+   907→  const hasMessages = messages.length > 0;
+   908→  const isDebateMode = activeSession?.mode !== 'fast';
+   909→
+   910→  // Auto-scroll to bottom on new messages
+   911→  useEffect(() => {
+   912→    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+   913→  }, [messages]);
+   914→
+   915→  // Sync processing state with loading
+   916→  useEffect(() => {
+   917→    setIsProcessing(loading);
+   918→  }, [loading, setIsProcessing]);
+   919→
+   920→  // Handle send
+   921→  const handleSend = useCallback(async () => {
+   922→    const trimmed = input.trim();
+   923→    if (!trimmed || isProcessing) return;
+   924→
+   925→    // Create a session if none active
+   926→    let sessionId = effectiveSessionId;
+   927→    if (!sessionId) {
+   928→      sessionId = await createSession(undefined, debateMode);
+   929→    }
+   930→
+   931→    setInput('');
+   932→    setShowWebSearch(false);
+   933→    await sendMessage(trimmed);
+   934→  }, [input, isProcessing, effectiveSessionId, debateMode, createSession, sendMessage]);
+   935→
+   936→  // Handle keyboard
+   937→  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+   938→    if (e.key === 'Enter' && !e.shiftKey) {
+   939→      e.preventDefault();
+   940→      handleSend();
+   941→    }
+   942→  };
+   943→
+   944→  // Handle suggestion click
+   945→  const handleSuggestionClick = useCallback((text: string) => {
+   946→    setInput(text);
+   947→    textareaRef.current?.focus();
+   948→  }, []);
+   949→
+   950→  // Handle delete session
+   951→  const handleDeleteSession = useCallback(async () => {
+   952→    if (effectiveSessionId) {
+   953→      await deleteSession(effectiveSessionId);
+   954→    }
+   955→  }, [effectiveSessionId, deleteSession]);
+   956→
+   957→  // Handle title edit
+   958→  const handleStartEditTitle = () => {
+   959→    setEditTitle(activeSession?.title ?? 'New Session');
+   960→    setIsEditingTitle(true);
+   961→  };
+   962→
+   963→  const handleSaveTitle = () => {
+   964→    setIsEditingTitle(false);
+   965→    // In a real app, we'd PATCH the session title
+   966→  };
+   967→
+   968→  // Handle web search
+   969→  const handleWebSearch = async () => {
+   970→    const q = searchQuery.trim();
+   971→    if (!q) return;
+   972→
+   973→    setSearching(true);
+   974→    try {
+   975→      const res = await fetch('/api/web-search', {
+   976→        method: 'POST',
+   977→        headers: { 'Content-Type': 'application/json' },
+   978→        body: JSON.stringify({ query: q }),
+   979→      });
+   980→      if (res.ok) {
+   981→        const data = await res.json();
+   982→        setSearchResults(data.results ?? []);
+   983→      }
+   984→    } catch {
+   985→      // Silently fail
+   986→    } finally {
+   987→      setSearching(false);
+   988→    }
+   989→  };
+   990→
+   991→  // Handle search result click (insert context into input)
+   992→  const handleSearchResultClick = (result: WebSearchResult) => {
+   993→    setInput((prev) => {
+   994→      const context = `\n\n[Web Context: ${result.title}]\n${result.snippet}`;
+   995→      return prev + context;
+   996→    });
+   997→    textareaRef.current?.focus();
+   998→  };
+   999→
+  1000→  // Handle stop
+  1001→  const handleStop = () => {
+  1002→    setIsProcessing(false);
+  1003→  };
+  1004→
+  1005→  const tokenEstimate = estimateTokens(input);
+  1006→
+  1007→  return (
+  1008→    <div className="flex h-full bg-background">
+  1009→      <ResizablePanelGroup direction="horizontal" className="h-full">
+  1010→        {/* ================================================================== */}
+  1011→        {/* Left Panel: Chat Messages                                           */}
+  1012→        {/* ================================================================== */}
+  1013→        <ResizablePanel defaultSize={70} minSize={40}>
+  1014→          <div className="flex h-full min-h-0 flex-col">
+  1015→            {/* Session Header */}
+  1016→            {activeSession && (
+  1017→              <div className="flex items-center justify-between border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 py-2.5">
+  1018→                <div className="flex items-center gap-2.5">
+  1019→                  {isEditingTitle ? (
+  1020→                    <input
+  1021→                      autoFocus
+  1022→                      value={editTitle}
+  1023→                      onChange={(e) => setEditTitle(e.target.value)}
+  1024→                      onBlur={handleSaveTitle}
+  1025→                      onKeyDown={(e) => {
+  1026→                        if (e.key === 'Enter') handleSaveTitle();
+  1027→                        if (e.key === 'Escape') setIsEditingTitle(false);
+  1028→                      }}
+  1029→                      className="bg-transparent text-sm font-semibold text-foreground outline-none border-b border-violet-500/40 px-1 py-0.5"
+  1030→                    />
+  1031→                  ) : (
+  1032→                    <button
+  1033→                      onClick={handleStartEditTitle}
+  1034→                      className="flex items-center gap-2 group"
+  1035→                    >
+  1036→                      <span className="text-sm font-semibold text-foreground group-hover:text-violet-300 transition-colors">
+  1037→                        {activeSession.title}
+  1038→                      </span>
+  1039→                      <Edit className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+  1040→                    </button>
+  1041→                  )}
+  1042→                  <Badge
+  1043→                    variant="outline"
+  1044→                    className={`text-[10px] px-1.5 py-0 h-5 border ${MODE_STYLES[activeSession.mode]}`}
+  1045→                  >
+  1046→                    {MODE_LABELS[activeSession.mode]}
+  1047→                  </Badge>
+  1048→                </div>
+  1049→                <div className="flex items-center gap-1">
+  1050→                  <Tooltip>
+  1051→                    <TooltipTrigger asChild>
+  1052→                      <Button
+  1053→                        variant="ghost"
+  1054→                        size="icon"
+  1055→                        className="h-7 w-7 text-muted-foreground/70 hover:text-red-400 hover:bg-red-500/10"
+  1056→                        onClick={handleDeleteSession}
+  1057→                      >
+  1058→                        <Trash2 className="h-3.5 w-3.5" />
+  1059→                      </Button>
+  1060→                    </TooltipTrigger>
+  1061→                    <TooltipContent side="bottom">Delete session</TooltipContent>
+  1062→                  </Tooltip>
+  1063→                </div>
+  1064→              </div>
+  1065→            )}
+  1066→
+  1067→            {/* Messages Area / Empty State */}
+  1068→            {!hasMessages && !isProcessing ? (
+  1069→              <div className="flex-1">
+  1070→                <EmptyState onSuggestionClick={handleSuggestionClick} />
+  1071→              </div>
+  1072→            ) : (
+  1073→              <ScrollArea className="flex-1 min-h-0">
+  1074→                <div className="flex flex-col py-4">
+  1075→                  <AnimatePresence mode="popLayout">
+  1076→                    {messages.map((message) => (
+  1077→                      <MessageBubble key={message.id} message={message} />
+  1078→                    ))}
+  1079→                  </AnimatePresence>
+  1080→
+  1081→                  {/* Typing Indicator */}
+  1082→                  <AnimatePresence>
+  1083→                    {isProcessing && (
+  1084→                      <TypingIndicator
+  1085→                        agentName={
+  1086→                          isDebateMode ? 'NEXUS Council' : 'Architect'
+  1087→                        }
+  1088→                      />
+  1089→                    )}
+  1090→                  </AnimatePresence>
+  1091→
+  1092→                  {/* Error banner */}
+  1093→                  {error && (
+  1094→                    <motion.div
+  1095→                      initial={{ opacity: 0, y: 10 }}
+  1096→                      animate={{ opacity: 1, y: 0 }}
+  1097→                      className="mx-4 my-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3"
+  1098→                    >
+  1099→                      <div className="flex items-center gap-2">
+  1100→                        <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+  1101→                        <p className="text-xs text-red-300">{error}</p>
+  1102→                      </div>
+  1103→                    </motion.div>
+  1104→                  )}
+  1105→
+  1106→                  <div ref={messagesEndRef} />
+  1107→                </div>
+  1108→              </ScrollArea>
+  1109→            )}
+  1110→
+  1111→            {/* Chat Input Area */}
+  1112→            <div className="shrink-0 border-t border-border/60 bg-background/80 backdrop-blur-sm">
+  1113→              {/* Web Search Inline Bar */}
+  1114→              <AnimatePresence>
+  1115→                {showWebSearch && (
+  1116→                  <motion.div
+  1117→                    initial={{ height: 0, opacity: 0 }}
+  1118→                    animate={{ height: 'auto', opacity: 1 }}
+  1119→                    exit={{ height: 0, opacity: 0 }}
+  1120→                    className="overflow-hidden"
+  1121→                  >
+  1122→                    <div className="flex items-center gap-2 px-4 py-2 border-b border-border/40">
+  1123→                      <Search className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+  1124→                      <Input
+  1125→                        value={searchQuery}
+  1126→                        onChange={(e) => setSearchQuery(e.target.value)}
+  1127→                        onKeyDown={(e) => {
+  1128→                          if (e.key === 'Enter') handleWebSearch();
+  1129→                        }}
+  1130→                        placeholder="Search the web..."
+  1131→                        className="h-7 border-border bg-card/50 text-xs text-secondary-foreground placeholder:text-muted-foreground/50 focus-visible:ring-violet-500/30"
+  1132→                        disabled={searching}
+  1133→                      />
+  1134→                      <Button
+  1135→                        size="sm"
+  1136→                        variant="ghost"
+  1137→                        onClick={handleWebSearch}
+  1138→                        disabled={searching || !searchQuery.trim()}
+  1139→                        className="h-7 px-2 text-xs text-muted-foreground hover:text-secondary-foreground"
+  1140→                      >
+  1141→                        {searching ? '...' : 'Go'}
+  1142→                      </Button>
+  1143→                    </div>
+  1144→                  </motion.div>
+  1145→                )}
+  1146→              </AnimatePresence>
+  1147→
+  1148→              {/* Toolbar + Input */}
+  1149→              <div className="px-4 pb-3 pt-2">
+  1150→                {/* Toolbar */}
+  1151→                <div className="flex items-center gap-1 mb-2">
+  1152→                  <Tooltip>
+  1153→                    <TooltipTrigger asChild>
+  1154→                      <Button
+  1155→                        variant={showWebSearch ? 'secondary' : 'ghost'}
+  1156→                        size="icon"
+  1157→                        className={`h-7 w-7 ${showWebSearch ? 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20' : 'text-muted-foreground/70 hover:text-secondary-foreground hover:bg-muted'}`}
+  1158→                        onClick={() => setShowWebSearch(!showWebSearch)}
+  1159→                      >
+  1160→                        <Globe className="h-3.5 w-3.5" />
+  1161→                      </Button>
+  1162→                    </TooltipTrigger>
+  1163→                    <TooltipContent side="top">Web Search</TooltipContent>
+  1164→                  </Tooltip>
+  1165→
+  1166→                  <Tooltip>
+  1167→                    <TooltipTrigger asChild>
+  1168→                      <Button
+  1169→                        variant="ghost"
+  1170→                        size="icon"
+  1171→                        className="h-7 w-7 text-muted-foreground/70 hover:text-secondary-foreground hover:bg-muted"
+  1172→                      >
+  1173→                        <Paperclip className="h-3.5 w-3.5" />
+  1174→                      </Button>
+  1175→                    </TooltipTrigger>
+  1176→                    <TooltipContent side="top">Attach File</TooltipContent>
+  1177→                  </Tooltip>
+  1178→
+  1179→                  <Tooltip>
+  1180→                    <TooltipTrigger asChild>
+  1181→                      <Button
+  1182→                        variant="ghost"
+  1183→                        size="icon"
+  1184→                        className="h-7 w-7 text-muted-foreground/70 hover:text-secondary-foreground hover:bg-muted"
+  1185→                      >
+  1186→                        <Database className="h-3.5 w-3.5" />
+  1187→                      </Button>
+  1188→                    </TooltipTrigger>
+  1189→                    <TooltipContent side="top">RAG Search</TooltipContent>
+  1190→                  </Tooltip>
+  1191→
+  1192→                  {/* Spacer */}
+  1193→                  <div className="flex-1" />
+  1194→
+  1195→                  {/* Token / char count */}
+  1196→                  {input.length > 0 && (
+  1197→                    <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+  1198→                      ~{tokenEstimate} tokens
+  1199→                    </span>
+  1200→                  )}
+  1201→                </div>
+  1202→
+  1203→                {/* Input row */}
+  1204→                <div className="relative flex items-end gap-2 rounded-xl border border-border bg-card/50 focus-within:border-violet-500/40 transition-colors">
+  1205→                  <Textarea
+  1206→                    ref={textareaRef}
+  1207→                    value={input}
+  1208→                    onChange={(e) => setInput(e.target.value)}
+  1209→                    onKeyDown={handleKeyDown}
+  1210→                    placeholder="Message NEXUS..."
+  1211→                    className="flex-1 resize-none border-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[120px] py-2.5 px-3"
+  1212→                    rows={1}
+  1213→                    disabled={isProcessing}
+  1214→                    onInput={(e) => {
+  1215→                      const target = e.target as HTMLTextAreaElement;
+  1216→                      target.style.height = 'auto';
+  1217→                      target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+  1218→                    }}
+  1219→                  />
+  1220→                  {isProcessing ? (
+  1221→                    <Tooltip>
+  1222→                      <TooltipTrigger asChild>
+  1223→                        <Button
+  1224→                          size="icon"
+  1225→                          variant="ghost"
+  1226→                          onClick={handleStop}
+  1227→                          className="h-8 w-8 mr-2 mb-2 shrink-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+  1228→                        >
+  1229→                          <StopCircle className="h-4 w-4" />
+  1230→                        </Button>
+  1231→                      </TooltipTrigger>
+  1232→                      <TooltipContent side="top">Stop generation</TooltipContent>
+  1233→                    </Tooltip>
+  1234→                  ) : (
+  1235→                    <Tooltip>
+  1236→                      <TooltipTrigger asChild>
+  1237→                        <Button
+  1238→                          size="icon"
+  1239→                          onClick={handleSend}
+  1240→                          disabled={!input.trim()}
+  1241→                          className="h-8 w-8 mr-2 mb-2 shrink-0 bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-30 disabled:bg-muted"
+  1242→                        >
+  1243→                          <Send className="h-4 w-4" />
+  1244→                        </Button>
+  1245→                      </TooltipTrigger>
+  1246→                      <TooltipContent side="top">Send message</TooltipContent>
+  1247→                    </Tooltip>
+  1248→                  )}
+  1249→                </div>
+  1250→
+  1251→                {/* Footer hint */}
+  1252→                <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
+  1253→                  Press <kbd className="rounded border border-border bg-card px-1 py-0.5 text-[9px] font-mono">Enter</kbd> to send,{' '}
+  1254→                  <kbd className="rounded border border-border bg-card px-1 py-0.5 text-[9px] font-mono">Shift+Enter</kbd> for new line
+  1255→                </p>
+  1256→              </div>
+  1257→            </div>
+  1258→          </div>
+  1259→        </ResizablePanel>
+  1260→
+  1261→        {/* ================================================================== */}
+  1262→        {/* Right Panel: Session Info, Debate, Cost                            */}
+  1263→        {/* ================================================================== */}
+  1264→        <ResizableHandle withHandle className="bg-muted hover:bg-accent transition-colors" />
+  1265→        <ResizablePanel defaultSize={30} minSize={20}>
+  1266→          <div className="h-full border-l border-border/60 bg-background">
+  1267→            <div className="flex items-center border-b border-border/60 px-4 py-2.5">
+  1268→              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground/70 mr-2" />
+  1269→              <span className="text-xs font-medium text-muted-foreground">Details</span>
+  1270→            </div>
+  1271→            <RightPanelContent
+  1272→              messages={messages}
+  1273→              session={activeSession}
+  1274→              searchResults={searchResults}
+  1275→            />
+  1276→          </div>
+  1277→        </ResizablePanel>
+  1278→      </ResizablePanelGroup>
+  1279→    </div>
+  1280→  );
+  1281→}
+  1282→

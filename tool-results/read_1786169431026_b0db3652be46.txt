@@ -1,0 +1,1269 @@
+     1→'use client';
+     2→
+     3→import React, { useCallback, useEffect, useMemo, useState } from 'react';
+     4→import { motion, AnimatePresence } from 'framer-motion';
+     5→import { toast } from 'sonner';
+     6→import { useProviderStore } from '@/stores/provider-store';
+     7→import { PROVIDER_TYPES } from '@/lib/constants';
+     8→import type { LlmProvider, ProviderType } from '@/lib/types';
+     9→
+    10→import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    11→import { Button } from '@/components/ui/button';
+    12→import {
+    13→  Dialog,
+    14→  DialogContent,
+    15→  DialogHeader,
+    16→  DialogTitle,
+    17→  DialogDescription,
+    18→  DialogFooter,
+    19→} from '@/components/ui/dialog';
+    20→import { Input } from '@/components/ui/input';
+    21→import { Label } from '@/components/ui/label';
+    22→import {
+    23→  Select,
+    24→  SelectContent,
+    25→  SelectItem,
+    26→  SelectTrigger,
+    27→  SelectValue,
+    28→  SelectGroup,
+    29→  SelectLabel,
+    30→} from '@/components/ui/select';
+    31→import { Switch } from '@/components/ui/switch';
+    32→import { Badge } from '@/components/ui/badge';
+    33→import { Checkbox } from '@/components/ui/checkbox';
+    34→import {
+    35→  AlertDialog,
+    36→  AlertDialogContent,
+    37→  AlertDialogHeader,
+    38→  AlertDialogTitle,
+    39→  AlertDialogDescription,
+    40→  AlertDialogFooter,
+    41→  AlertDialogAction,
+    42→  AlertDialogCancel,
+    43→} from '@/components/ui/alert-dialog';
+    44→import { Skeleton } from '@/components/ui/skeleton';
+    45→import {
+    46→  Tooltip,
+    47→  TooltipContent,
+    48→  TooltipProvider,
+    49→  TooltipTrigger,
+    50→} from '@/components/ui/tooltip';
+    51→import { Separator } from '@/components/ui/separator';
+    52→import { ScrollArea } from '@/components/ui/scroll-area';
+    53→
+    54→import {
+    55→  Plus,
+    56→  Server,
+    57→  Wifi,
+    58→  Edit,
+    59→  Trash2,
+    60→  TestTube,
+    61→  Eye,
+    62→  EyeOff,
+    63→  Globe,
+    64→  HardDrive,
+    65→  Check,
+    66→  X,
+    67→  Loader2,
+    68→  ExternalLink,
+    69→  Key,
+    70→  Settings,
+    71→  Cloud,
+    72→  BrainCircuit,
+    73→  Zap,
+    74→  Box,
+    75→  Cpu,
+    76→  Flame,
+    77→  Rabbit,
+    78→  CircleDot,
+    79→  Sparkles,
+    80→} from 'lucide-react';
+    81→
+    82→// =============================================================================
+    83→// Provider icon & color mappings
+    84→// =============================================================================
+    85→
+    86→interface ProviderVisual {
+    87→  icon: React.ElementType;
+    88→  color: string;
+    89→  bg: string;
+    90→  border: string;
+    91→}
+    92→
+    93→const PROVIDER_VISUALS: Record<ProviderType, ProviderVisual> = {
+    94→  openai: { icon: Sparkles, color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
+    95→  anthropic: { icon: BrainCircuit, color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20' },
+    96→  google: { icon: Cloud, color: 'text-sky-400', bg: 'bg-sky-500/10', border: 'border-sky-500/20' },
+    97→  mistral: { icon: Zap, color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/20' },
+    98→  groq: { icon: Flame, color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20' },
+    99→  together: { icon: CircleDot, color: 'text-teal-400', bg: 'bg-teal-500/10', border: 'border-teal-500/20' },
+   100→  ollama: { icon: Rabbit, color: 'text-violet-400', bg: 'bg-violet-500/10', border: 'border-violet-500/20' },
+   101→  lmstudio: { icon: Cpu, color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20' },
+   102→  vllm: { icon: Server, color: 'text-fuchsia-400', bg: 'bg-fuchsia-500/10', border: 'border-fuchsia-500/20' },
+   103→  llamacpp: { icon: Box, color: 'text-lime-400', bg: 'bg-lime-500/10', border: 'border-lime-500/20' },
+   104→  koboldcpp: { icon: HardDrive, color: 'text-yellow-400', bg: 'bg-yellow-500/10', border: 'border-yellow-500/20' },
+   105→  custom: { icon: Settings, color: 'text-zinc-400', bg: 'bg-zinc-500/10', border: 'border-zinc-500/20' },
+   106→};
+   107→
+   108→// =============================================================================
+   109→// Form state type
+   110→// =============================================================================
+   111→
+   112→interface ProviderFormData {
+   113→  name: string;
+   114→  type: ProviderType;
+   115→  baseUrl: string;
+   116→  apiKey: string;
+   117→  models: string[];
+   118→  isActive: boolean;
+   119→}
+   120→
+   121→const EMPTY_FORM: ProviderFormData = {
+   122→  name: '',
+   123→  type: 'openai',
+   124→  baseUrl: '',
+   125→  apiKey: '',
+   126→  models: [],
+   127→  isActive: true,
+   128→};
+   129→
+   130→// =============================================================================
+   131→// Discovery result type
+   132→// =============================================================================
+   133→
+   134→interface DiscoveredProvider {
+   135→  port: number;
+   136→  baseUrl: string;
+   137→  models: string[];
+   138→  type: string;
+   139→  name: string;
+   140→}
+   141→
+   142→// =============================================================================
+   143→// Animation variants
+   144→// =============================================================================
+   145→
+   146→const cardVariants = {
+   147→  hidden: { opacity: 0, y: 20 },
+   148→  visible: (i: number) => ({
+   149→    opacity: 1,
+   150→    y: 0,
+   151→    transition: {
+   152→      delay: i * 0.06,
+   153→      duration: 0.4,
+   154→      ease: [0.25, 0.46, 0.45, 0.94],
+   155→    },
+   156→  }),
+   157→  exit: { opacity: 0, y: -10, transition: { duration: 0.2 } },
+   158→};
+   159→
+   160→const discoveryCardVariants = {
+   161→  hidden: { opacity: 0, scale: 0.95 },
+   162→  visible: (i: number) => ({
+   163→    opacity: 1,
+   164→    scale: 1,
+   165→    transition: { delay: i * 0.08, duration: 0.3 },
+   166→  }),
+   167→  exit: { opacity: 0, scale: 0.95, transition: { duration: 0.15 } },
+   168→};
+   169→
+   170→// =============================================================================
+   171→// Skeleton grid for loading state
+   172→// =============================================================================
+   173→
+   174→function ProviderSkeletonGrid() {
+   175→  return (
+   176→    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+   177→      {Array.from({ length: 6 }).map((_, i) => (
+   178→        <div key={i} className="rounded-xl border border-zinc-800/60 bg-zinc-900 p-5">
+   179→          <div className="flex items-start gap-3">
+   180→            <Skeleton className="h-10 w-10 rounded-lg bg-zinc-800" />
+   181→            <div className="flex-1 space-y-2">
+   182→              <Skeleton className="h-4 w-32 bg-zinc-800" />
+   183→              <Skeleton className="h-3 w-20 bg-zinc-800" />
+   184→            </div>
+   185→          </div>
+   186→          <div className="mt-4 space-y-2">
+   187→            <Skeleton className="h-3 w-full bg-zinc-800" />
+   188→            <Skeleton className="h-3 w-3/4 bg-zinc-800" />
+   189→          </div>
+   190→          <div className="mt-4 flex items-center gap-2">
+   191→            <Skeleton className="h-5 w-16 bg-zinc-800" />
+   192→            <Skeleton className="h-5 w-20 bg-zinc-800" />
+   193→          </div>
+   194→          <Separator className="my-4 bg-zinc-800" />
+   195→          <div className="flex gap-2">
+   196→            <Skeleton className="h-8 w-8 rounded-md bg-zinc-800" />
+   197→            <Skeleton className="h-8 w-8 rounded-md bg-zinc-800" />
+   198→            <Skeleton className="h-8 w-8 rounded-md bg-zinc-800" />
+   199→          </div>
+   200→        </div>
+   201→      ))}
+   202→    </div>
+   203→  );
+   204→}
+   205→
+   206→// =============================================================================
+   207→// Empty state
+   208→// =============================================================================
+   209→
+   210→function EmptyState({ onAdd }: { onAdd: () => void }) {
+   211→  return (
+   212→    <motion.div
+   213→      initial={{ opacity: 0, y: 20 }}
+   214→      animate={{ opacity: 1, y: 0 }}
+   215→      transition={{ duration: 0.5 }}
+   216→      className="flex flex-col items-center justify-center py-24 px-4"
+   217→    >
+   218→      <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-violet-500/10 border border-violet-500/20 mb-6">
+   219→        <Server className="h-9 w-9 text-violet-400" />
+   220→      </div>
+   221→      <h3 className="text-xl font-semibold text-zinc-100 mb-2">No providers configured</h3>
+   222→      <p className="text-sm text-zinc-400 text-center max-w-md mb-8">
+   223→        Add your first LLM provider to get started. Connect to cloud APIs like OpenAI and Anthropic, or discover local servers running Ollama, LM Studio, and more.
+   224→      </p>
+   225→      <div className="flex gap-3">
+   226→        <Button onClick={onAdd} className="bg-violet-600 hover:bg-violet-500 text-white gap-2">
+   227→          <Plus className="h-4 w-4" />
+   228→          Add Provider
+   229→        </Button>
+   230→      </div>
+   231→    </motion.div>
+   232→  );
+   233→}
+   234→
+   235→// =============================================================================
+   236→// Provider Card
+   237→// =============================================================================
+   238→
+   239→function ProviderCard({
+   240→  provider,
+   241→  index,
+   242→  onEdit,
+   243→  onTest,
+   244→  onDelete,
+   245→  testingId,
+   246→}: {
+   247→  provider: LlmProvider;
+   248→  index: number;
+   249→  onEdit: (p: LlmProvider) => void;
+   250→  onTest: (id: string) => void;
+   251→  onDelete: (p: LlmProvider) => void;
+   252→  testingId: string | null;
+   253→}) {
+   254→  const visual = PROVIDER_VISUALS[provider.type] ?? PROVIDER_VISUALS.custom;
+   255→  const Icon = visual.icon;
+   256→  const isTesting = testingId === provider.id;
+   257→
+   258→  const typeLabel = PROVIDER_TYPES.find((t) => t.value === provider.type)?.label ?? provider.type;
+   259→
+   260→  return (
+   261→    <motion.div
+   262→      custom={index}
+   263→      variants={cardVariants}
+   264→      initial="hidden"
+   265→      animate="visible"
+   266→      exit="exit"
+   267→      layout
+   268→    >
+   269→      <Card className="group relative overflow-hidden border-zinc-800/60 bg-zinc-900 hover:border-violet-500/30 transition-all duration-300 hover:shadow-[0_0_20px_-4px_rgba(139,92,246,0.15)] py-0 gap-0">
+   270→        {/* Hover glow effect */}
+   271→        <div className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-violet-500/5 via-transparent to-transparent" />
+   272→
+   273→        <CardHeader className="pb-3 pt-5 px-5">
+   274→          <div className="flex items-start gap-3">
+   275→            {/* Provider icon */}
+   276→            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border ${visual.bg} ${visual.border}`}>
+   277→              <Icon className={`h-5 w-5 ${visual.color}`} />
+   278→            </div>
+   279→
+   280→            <div className="flex-1 min-w-0">
+   281→              <div className="flex items-center gap-2 flex-wrap">
+   282→                <CardTitle className="text-zinc-100 text-sm font-semibold truncate">
+   283→                  {provider.name}
+   284→                </CardTitle>
+   285→                {/* Status indicator */}
+   286→                <span className="relative flex h-2 w-2 shrink-0">
+   287→                  <span
+   288→                    className={`absolute inline-flex h-full w-full rounded-full ${
+   289→                      provider.isActive ? 'bg-emerald-400' : 'bg-red-500'
+   290→                    }`}
+   291→                  />
+   292→                  <span
+   293→                    className={`relative inline-flex h-2 w-2 rounded-full ${
+   294→                      provider.isActive ? 'bg-emerald-400' : 'bg-red-500'
+   295→                    } animate-ping ${
+   296→                      provider.isActive ? 'opacity-75' : 'opacity-0'
+   297→                    }`}
+   298→                  />
+   299→                </span>
+   300→              </div>
+   301→              <div className="flex items-center gap-2 mt-1 flex-wrap">
+   302→                <Badge
+   303→                  variant="outline"
+   304→                  className="text-[10px] px-1.5 py-0 h-5 border-zinc-700 text-zinc-400 font-normal"
+   305→                >
+   306→                  {typeLabel}
+   307→                </Badge>
+   308→                {provider.isLocal && (
+   309→                  <Badge className="text-[10px] px-1.5 py-0 h-5 bg-amber-500/15 text-amber-400 border-amber-500/25 hover:bg-amber-500/20 font-normal">
+   310→                    <HardDrive className="h-2.5 w-2.5 mr-1" />
+   311→                    Local
+   312→                  </Badge>
+   313→                )}
+   314→                <Badge
+   315→                  variant="outline"
+   316→                  className="text-[10px] px-1.5 py-0 h-5 border-zinc-700 text-zinc-400 font-normal"
+   317→                >
+   318→                  {provider.models.length} model{provider.models.length !== 1 ? 's' : ''}
+   319→                </Badge>
+   320→              </div>
+   321→            </div>
+   322→          </div>
+   323→        </CardHeader>
+   324→
+   325→        <CardContent className="px-5 pb-3">
+   326→          {/* Base URL */}
+   327→          <TooltipProvider delayDuration={300}>
+   328→            <Tooltip>
+   329→              <TooltipTrigger asChild>
+   330→                <div className="flex items-center gap-1.5 text-xs text-zinc-500 truncate group-hover:text-zinc-400 transition-colors">
+   331→                  <Globe className="h-3 w-3 shrink-0" />
+   332→                  <span className="truncate">{provider.baseUrl || 'No URL configured'}</span>
+   333→                </div>
+   334→              </TooltipTrigger>
+   335→              <TooltipContent side="bottom" className="bg-zinc-800 border-zinc-700 text-zinc-300 text-xs">
+   336→                {provider.baseUrl || 'No URL configured'}
+   337→              </TooltipContent>
+   338→            </Tooltip>
+   339→          </TooltipProvider>
+   340→
+   341→          {/* Models list (show first 3) */}
+   342→          {provider.models.length > 0 && (
+   343→            <div className="mt-3 flex flex-wrap gap-1">
+   344→              {provider.models.slice(0, 3).map((model) => (
+   345→                <Badge
+   346→                  key={model}
+   347→                  variant="secondary"
+   348→                  className="text-[10px] px-1.5 py-0 h-5 bg-zinc-800 text-zinc-400 hover:bg-zinc-700 font-normal"
+   349→                >
+   350→                  {model.length > 24 ? model.slice(0, 24) + '…' : model}
+   351→                </Badge>
+   352→              ))}
+   353→              {provider.models.length > 3 && (
+   354→                <Badge
+   355→                  variant="secondary"
+   356→                  className="text-[10px] px-1.5 py-0 h-5 bg-zinc-800 text-zinc-500 hover:bg-zinc-700 font-normal"
+   357→                >
+   358→                  +{provider.models.length - 3} more
+   359→                </Badge>
+   360→              )}
+   361→            </div>
+   362→          )}
+   363→        </CardContent>
+   364→
+   365→        <Separator className="bg-zinc-800" />
+   366→
+   367→        <CardFooter className="px-5 py-3 gap-2">
+   368→          <TooltipProvider delayDuration={300}>
+   369→            <Tooltip>
+   370→              <TooltipTrigger asChild>
+   371→                <Button
+   372→                  variant="ghost"
+   373→                  size="icon"
+   374→                  className="h-8 w-8 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+   375→                  onClick={() => onEdit(provider)}
+   376→                >
+   377→                  <Edit className="h-3.5 w-3.5" />
+   378→                  <span className="sr-only">Edit</span>
+   379→                </Button>
+   380→              </TooltipTrigger>
+   381→              <TooltipContent side="bottom" className="bg-zinc-800 border-zinc-700 text-zinc-300 text-xs">
+   382→                Edit provider
+   383→              </TooltipContent>
+   384→            </Tooltip>
+   385→
+   386→            <Tooltip>
+   387→              <TooltipTrigger asChild>
+   388→                <Button
+   389→                  variant="ghost"
+   390→                  size="icon"
+   391→                  className="h-8 w-8 text-zinc-400 hover:text-violet-400 hover:bg-violet-500/10"
+   392→                  onClick={() => onTest(provider.id)}
+   393→                  disabled={isTesting}
+   394→                >
+   395→                  {isTesting ? (
+   396→                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+   397→                  ) : (
+   398→                    <TestTube className="h-3.5 w-3.5" />
+   399→                  )}
+   400→                  <span className="sr-only">Test connection</span>
+   401→                </Button>
+   402→              </TooltipTrigger>
+   403→              <TooltipContent side="bottom" className="bg-zinc-800 border-zinc-700 text-zinc-300 text-xs">
+   404→                Test connection
+   405→              </TooltipContent>
+   406→            </Tooltip>
+   407→
+   408→            <Tooltip>
+   409→              <TooltipTrigger asChild>
+   410→                <Button
+   411→                  variant="ghost"
+   412→                  size="icon"
+   413→                  className="h-8 w-8 text-zinc-400 hover:text-red-400 hover:bg-red-500/10 ml-auto"
+   414→                  onClick={() => onDelete(provider)}
+   415→                >
+   416→                  <Trash2 className="h-3.5 w-3.5" />
+   417→                  <span className="sr-only">Delete</span>
+   418→                </Button>
+   419→              </TooltipTrigger>
+   420→              <TooltipContent side="bottom" className="bg-zinc-800 border-zinc-700 text-zinc-300 text-xs">
+   421→                Delete provider
+   422→              </TooltipContent>
+   423→            </Tooltip>
+   424→          </TooltipProvider>
+   425→        </CardFooter>
+   426→      </Card>
+   427→    </motion.div>
+   428→  );
+   429→}
+   430→
+   431→// =============================================================================
+   432→// Provider Form Dialog
+   433→// =============================================================================
+   434→
+   435→function ProviderFormDialog({
+   436→  open,
+   437→  onOpenChange,
+   438→  editingProvider,
+   439→  onSave,
+   440→}: {
+   441→  open: boolean;
+   442→  onOpenChange: (open: boolean) => void;
+   443→  editingProvider: LlmProvider | null;
+   444→  onSave: (data: ProviderFormData) => Promise<void>;
+   445→}) {
+   446→  const [form, setForm] = useState<ProviderFormData>(EMPTY_FORM);
+   447→  const [showApiKey, setShowApiKey] = useState(false);
+   448→  const [saving, setSaving] = useState(false);
+   449→  const [customModel, setCustomModel] = useState('');
+   450→
+   451→  const isEditing = editingProvider !== null;
+   452→  const isLocal = PROVIDER_TYPES.find((t) => t.value === form.type)?.isLocal ?? false;
+   453→  const defaultModels = useMemo(
+   454→    () => PROVIDER_TYPES.find((t) => t.value === form.type)?.models ?? [],
+   455→    [form.type]
+   456→  );
+   457→
+   458→  // Populate form when editing or resetting
+   459→  useEffect(() => {
+   460→    if (editingProvider) {
+   461→      setForm({
+   462→        name: editingProvider.name,
+   463→        type: editingProvider.type,
+   464→        baseUrl: editingProvider.baseUrl,
+   465→        apiKey: editingProvider.apiKey,
+   466→        models: editingProvider.models,
+   467→        isActive: editingProvider.isActive,
+   468→      });
+   469→    } else {
+   470→      setForm(EMPTY_FORM);
+   471→    }
+   472→    setShowApiKey(false);
+   473→    setCustomModel('');
+   474→  }, [editingProvider, open]);
+   475→
+   476→  // Auto-fill base URL when type changes
+   477→  const handleTypeChange = useCallback(
+   478→    (value: string) => {
+   479→      const type = value as ProviderType;
+   480→      const def = PROVIDER_TYPES.find((t) => t.value === type);
+   481→      setForm((prev) => ({
+   482→        ...prev,
+   483→        type,
+   484→        baseUrl: def?.defaultBaseUrl ?? '',
+   485→        models: [],
+   486→      }));
+   487→    },
+   488→    []
+   489→  );
+   490→
+   491→  const toggleModel = useCallback((model: string) => {
+   492→    setForm((prev) => ({
+   493→      ...prev,
+   494→      models: prev.models.includes(model)
+   495→        ? prev.models.filter((m) => m !== model)
+   496→        : [...prev.models, model],
+   497→    }));
+   498→  }, []);
+   499→
+   500→  const addCustomModel = useCallback(() => {
+   501→    const trimmed = customModel.trim();
+   502→    if (trimmed && !form.models.includes(trimmed)) {
+   503→      setForm((prev) => ({
+   504→        ...prev,
+   505→        models: [...prev.models, trimmed],
+   506→      }));
+   507→      setCustomModel('');
+   508→    }
+   509→  }, [customModel, form.models]);
+   510→
+   511→  const removeModel = useCallback((model: string) => {
+   512→    setForm((prev) => ({
+   513→      ...prev,
+   514→      models: prev.models.filter((m) => m !== model),
+   515→    }));
+   516→  }, []);
+   517→
+   518→  const handleSave = useCallback(async () => {
+   519→    if (!form.name.trim()) {
+   520→      toast.error('Provider name is required');
+   521→      return;
+   522→    }
+   523→    if (!form.baseUrl.trim()) {
+   524→      toast.error('Base URL is required');
+   525→      return;
+   526→    }
+   527→    if (!isLocal && !form.apiKey.trim() && form.type !== 'custom') {
+   528→      toast.error('API key is required for cloud providers');
+   529→      return;
+   530→    }
+   531→
+   532→    setSaving(true);
+   533→    try {
+   534→      await onSave(form);
+   535→      onOpenChange(false);
+   536→      toast.success(isEditing ? 'Provider updated' : 'Provider added', {
+   537→        description: `${form.name} has been ${isEditing ? 'updated' : 'added'} successfully.`,
+   538→      });
+   539→    } catch (err) {
+   540→      toast.error(isEditing ? 'Failed to update provider' : 'Failed to add provider', {
+   541→        description: err instanceof Error ? err.message : 'Unknown error',
+   542→      });
+   543→    } finally {
+   544→      setSaving(false);
+   545→    }
+   546→  }, [form, isLocal, isEditing, onSave, onOpenChange]);
+   547→
+   548→  const selectAllDefaults = useCallback(() => {
+   549→    setForm((prev) => ({
+   550→      ...prev,
+   551→      models: [...new Set([...prev.models, ...defaultModels])],
+   552→    }));
+   553→  }, [defaultModels]);
+   554→
+   555→  const deselectAllDefaults = useCallback(() => {
+   556→    setForm((prev) => ({
+   557→      ...prev,
+   558→      models: prev.models.filter((m) => !defaultModels.includes(m)),
+   559→    }));
+   560→  }, [defaultModels]);
+   561→
+   562→  return (
+   563→    <Dialog open={open} onOpenChange={onOpenChange}>
+   564→      <DialogContent className="bg-zinc-900 border-zinc-800 text-zinc-100 sm:max-w-lg max-h-[90vh] flex flex-col">
+   565→        <DialogHeader>
+   566→          <DialogTitle className="text-zinc-100">
+   567→            {isEditing ? 'Edit Provider' : 'Add Provider'}
+   568→          </DialogTitle>
+   569→          <DialogDescription className="text-zinc-400">
+   570→            {isEditing
+   571→              ? 'Update the configuration for this LLM provider.'
+   572→              : 'Configure a new LLM provider for your agents.'}
+   573→          </DialogDescription>
+   574→        </DialogHeader>
+   575→
+   576→        <ScrollArea className="flex-1 -mx-6 px-6">
+   577→          <div className="space-y-5 py-2">
+   578→            {/* Name */}
+   579→            <div className="space-y-2">
+   580→              <Label htmlFor="provider-name" className="text-zinc-300 text-sm">
+   581→                Name
+   582→              </Label>
+   583→              <Input
+   584→                id="provider-name"
+   585→                placeholder="e.g. My GPT-4o Instance"
+   586→                value={form.name}
+   587→                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+   588→                className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-violet-500/50 focus-visible:border-violet-500/50"
+   589→              />
+   590→            </div>
+   591→
+   592→            {/* Provider Type */}
+   593→            <div className="space-y-2">
+   594→              <Label className="text-zinc-300 text-sm">Provider Type</Label>
+   595→              <Select value={form.type} onValueChange={handleTypeChange}>
+   596→                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-100 focus:ring-violet-500/50 focus:border-violet-500/50">
+   597→                  <SelectValue placeholder="Select a provider type" />
+   598→                </SelectTrigger>
+   599→                <SelectContent className="bg-zinc-900 border-zinc-700">
+   600→                  <SelectGroup>
+   601→                    <SelectLabel className="text-zinc-500 text-xs">Cloud Providers</SelectLabel>
+   602→                    {PROVIDER_TYPES.filter((t) => !t.isLocal).map((t) => (
+   603→                      <SelectItem key={t.value} value={t.value} className="text-zinc-200 focus:bg-zinc-800 focus:text-zinc-100">
+   604→                        {t.label}
+   605→                      </SelectItem>
+   606→                    ))}
+   607→                  </SelectGroup>
+   608→                  <SelectGroup>
+   609→                    <SelectLabel className="text-zinc-500 text-xs">Local Providers</SelectLabel>
+   610→                    {PROVIDER_TYPES.filter((t) => t.isLocal).map((t) => (
+   611→                      <SelectItem key={t.value} value={t.value} className="text-zinc-200 focus:bg-zinc-800 focus:text-zinc-100">
+   612→                        {t.label}
+   613→                      </SelectItem>
+   614→                    ))}
+   615→                  </SelectGroup>
+   616→                </SelectContent>
+   617→              </Select>
+   618→            </div>
+   619→
+   620→            {/* Base URL */}
+   621→            <div className="space-y-2">
+   622→              <Label htmlFor="provider-url" className="text-zinc-300 text-sm">
+   623→                Base URL
+   624→              </Label>
+   625→              <Input
+   626→                id="provider-url"
+   627→                placeholder="https://api.example.com/v1"
+   628→                value={form.baseUrl}
+   629→                onChange={(e) => setForm((p) => ({ ...p, baseUrl: e.target.value }))}
+   630→                className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-violet-500/50 focus-visible:border-violet-500/50"
+   631→              />
+   632→              {form.type !== 'custom' && (
+   633→                <p className="text-[11px] text-zinc-500">
+   634→                  Default URL for {PROVIDER_TYPES.find((t) => t.value === form.type)?.label} — modify if using a proxy or self-hosted instance.
+   635→                </p>
+   636→              )}
+   637→            </div>
+   638→
+   639→            {/* API Key */}
+   640→            <div className="space-y-2">
+   641→              <Label htmlFor="provider-key" className="text-zinc-300 text-sm">
+   642→                <span className="flex items-center gap-1.5">
+   643→                  <Key className="h-3.5 w-3.5" />
+   644→                  API Key
+   645→                </span>
+   646→              </Label>
+   647→              <div className="relative">
+   648→                <Input
+   649→                  id="provider-key"
+   650→                  type={showApiKey ? 'text' : 'password'}
+   651→                  placeholder={isLocal ? 'Not required for local providers' : 'sk-...'}
+   652→                  value={form.apiKey}
+   653→                  onChange={(e) => setForm((p) => ({ ...p, apiKey: e.target.value }))}
+   654→                  className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 focus-visible:ring-violet-500/50 focus-visible:border-violet-500/50 pr-10"
+   655→                  disabled={isLocal}
+   656→                />
+   657→                <Button
+   658→                  type="button"
+   659→                  variant="ghost"
+   660→                  size="icon"
+   661→                  className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-zinc-500 hover:text-zinc-300"
+   662→                  onClick={() => setShowApiKey(!showApiKey)}
+   663→                  disabled={isLocal}
+   664→                >
+   665→                  {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+   666→                </Button>
+   667→              </div>
+   668→              {isLocal && (
+   669→                <p className="text-[11px] text-amber-400/80 flex items-center gap-1">
+   670→                  <HardDrive className="h-3 w-3" />
+   671→                  Not required for local providers
+   672→                </p>
+   673→              )}
+   674→            </div>
+   675→
+   676→            <Separator className="bg-zinc-800" />
+   677→
+   678→            {/* Models */}
+   679→            <div className="space-y-3">
+   680→              <div className="flex items-center justify-between">
+   681→                <Label className="text-zinc-300 text-sm">Models</Label>
+   682→                {defaultModels.length > 0 && (
+   683→                  <div className="flex gap-1">
+   684→                    <Button
+   685→                      type="button"
+   686→                      variant="ghost"
+   687→                      size="sm"
+   688→                      className="h-6 text-[11px] text-zinc-500 hover:text-violet-400 hover:bg-violet-500/10 px-2"
+   689→                      onClick={selectAllDefaults}
+   690→                    >
+   691→                      Select all
+   692→                    </Button>
+   693→                    <Button
+   694→                      type="button"
+   695→                      variant="ghost"
+   696→                      size="sm"
+   697→                      className="h-6 text-[11px] text-zinc-500 hover:text-zinc-400 hover:bg-zinc-800 px-2"
+   698→                      onClick={deselectAllDefaults}
+   699→                    >
+   700→                      Clear
+   701→                    </Button>
+   702→                  </div>
+   703→                )}
+   704→              </div>
+   705→
+   706→              {/* Default model checkboxes */}
+   707→              {defaultModels.length > 0 && (
+   708→                <div className="grid grid-cols-1 gap-1.5 max-h-40 overflow-y-auto pr-1">
+   709→                  {defaultModels.map((model) => (
+   710→                    <label
+   711→                      key={model}
+   712→                      className="flex items-center gap-2.5 rounded-md px-2.5 py-1.5 hover:bg-zinc-800/70 cursor-pointer transition-colors"
+   713→                    >
+   714→                      <Checkbox
+   715→                        checked={form.models.includes(model)}
+   716→                        onCheckedChange={() => toggleModel(model)}
+   717→                        className="border-zinc-600 data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600"
+   718→                      />
+   719→                      <span className="text-xs text-zinc-300 truncate">{model}</span>
+   720→                    </label>
+   721→                  ))}
+   722→                </div>
+   723→              )}
+   724→
+   725→              {/* Custom model input */}
+   726→              <div className="flex gap-2">
+   727→                <Input
+   728→                  placeholder="Add a custom model name…"
+   729→                  value={customModel}
+   730→                  onChange={(e) => setCustomModel(e.target.value)}
+   731→                  onKeyDown={(e) => {
+   732→                    if (e.key === 'Enter') {
+   733→                      e.preventDefault();
+   734→                      addCustomModel();
+   735→                    }
+   736→                  }}
+   737→                  className="bg-zinc-800 border-zinc-700 text-zinc-100 placeholder:text-zinc-500 text-xs focus-visible:ring-violet-500/50 focus-visible:border-violet-500/50"
+   738→                />
+   739→                <Button
+   740→                  type="button"
+   741→                  variant="outline"
+   742→                  size="icon"
+   743→                  className="h-9 w-9 shrink-0 border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+   744→                  onClick={addCustomModel}
+   745→                >
+   746→                  <Plus className="h-3.5 w-3.5" />
+   747→                </Button>
+   748→              </div>
+   749→
+   750→              {/* Selected models (excluding defaults) as removable badges */}
+   751→              {form.models.length > 0 && (
+   752→                <div className="flex flex-wrap gap-1.5">
+   753→                  {form.models.map((model) => (
+   754→                    <Badge
+   755→                      key={model}
+   756→                      variant="secondary"
+   757→                      className="text-[11px] px-2 py-0.5 h-6 bg-violet-500/15 text-violet-300 border-violet-500/25 hover:bg-violet-500/25 font-normal gap-1"
+   758→                    >
+   759→                      {model.length > 20 ? model.slice(0, 20) + '…' : model}
+   760→                      <button
+   761→                        type="button"
+   762→                        className="ml-0.5 hover:text-violet-100 transition-colors"
+   763→                        onClick={() => removeModel(model)}
+   764→                      >
+   765→                        <X className="h-2.5 w-2.5" />
+   766→                      </button>
+   767→                    </Badge>
+   768→                  ))}
+   769→                </div>
+   770→              )}
+   771→            </div>
+   772→
+   773→            <Separator className="bg-zinc-800" />
+   774→
+   775→            {/* Active toggle */}
+   776→            <div className="flex items-center justify-between">
+   777→              <div>
+   778→                <Label className="text-zinc-300 text-sm">Active</Label>
+   779→                <p className="text-[11px] text-zinc-500">Inactive providers won't be available to agents.</p>
+   780→              </div>
+   781→              <Switch
+   782→                checked={form.isActive}
+   783→                onCheckedChange={(checked) => setForm((p) => ({ ...p, isActive: checked }))}
+   784→                className="data-[state=checked]:bg-violet-600"
+   785→              />
+   786→            </div>
+   787→          </div>
+   788→        </ScrollArea>
+   789→
+   790→        <DialogFooter className="pt-4 border-t border-zinc-800">
+   791→          <Button
+   792→            variant="outline"
+   793→            onClick={() => onOpenChange(false)}
+   794→            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+   795→          >
+   796→            Cancel
+   797→          </Button>
+   798→          <Button
+   799→            onClick={handleSave}
+   800→            disabled={saving}
+   801→            className="bg-violet-600 hover:bg-violet-500 text-white min-w-[100px]"
+   802→          >
+   803→            {saving ? (
+   804→              <>
+   805→                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+   806→                Saving…
+   807→              </>
+   808→            ) : isEditing ? (
+   809→              'Save Changes'
+   810→            ) : (
+   811→              'Add Provider'
+   812→            )}
+   813→          </Button>
+   814→        </DialogFooter>
+   815→      </DialogContent>
+   816→    </Dialog>
+   817→  );
+   818→}
+   819→
+   820→// =============================================================================
+   821→// Delete Confirmation Dialog
+   822→// =============================================================================
+   823→
+   824→function DeleteConfirmDialog({
+   825→  open,
+   826→  onOpenChange,
+   827→  provider,
+   828→  onConfirm,
+   829→  deleting,
+   830→}: {
+   831→  open: boolean;
+   832→  onOpenChange: (open: boolean) => void;
+   833→  provider: LlmProvider | null;
+   834→  onConfirm: () => void;
+   835→  deleting: boolean;
+   836→}) {
+   837→  return (
+   838→    <AlertDialog open={open} onOpenChange={onOpenChange}>
+   839→      <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+   840→        <AlertDialogHeader>
+   841→          <AlertDialogTitle className="text-zinc-100">Delete Provider</AlertDialogTitle>
+   842→          <AlertDialogDescription className="text-zinc-400">
+   843→            Are you sure you want to delete{' '}
+   844→            <span className="text-zinc-200 font-medium">{provider?.name}</span>?
+   845→            This action cannot be undone. Any agents currently using this provider will need to be reassigned.
+   846→          </AlertDialogDescription>
+   847→        </AlertDialogHeader>
+   848→        <AlertDialogFooter>
+   849→          <AlertDialogCancel
+   850→            disabled={deleting}
+   851→            className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+   852→          >
+   853→            Cancel
+   854→          </AlertDialogCancel>
+   855→          <AlertDialogAction
+   856→            onClick={(e) => {
+   857→              e.preventDefault();
+   858→              onConfirm();
+   859→            }}
+   860→            disabled={deleting}
+   861→            className="bg-red-600 hover:bg-red-500 text-white focus:ring-red-500/50"
+   862→          >
+   863→            {deleting ? (
+   864→              <>
+   865→                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+   866→                Deleting…
+   867→              </>
+   868→            ) : (
+   869→              'Delete'
+   870→            )}
+   871→          </AlertDialogAction>
+   872→        </AlertDialogFooter>
+   873→      </AlertDialogContent>
+   874→    </AlertDialog>
+   875→  );
+   876→}
+   877→
+   878→// =============================================================================
+   879→// Discovery Results Section
+   880→// =============================================================================
+   881→
+   882→function DiscoveryResults({
+   883→  results,
+   884→  onAdd,
+   885→  onDismiss,
+   886→}: {
+   887→  results: DiscoveredProvider[];
+   888→  onAdd: (result: DiscoveredProvider) => void;
+   889→  onDismiss: () => void;
+   890→}) {
+   891→  if (results.length === 0) return null;
+   892→
+   893→  return (
+   894→    <motion.div
+   895→      initial={{ opacity: 0, height: 0 }}
+   896→      animate={{ opacity: 1, height: 'auto' }}
+   897→      exit={{ opacity: 0, height: 0 }}
+   898→      className="mb-6"
+   899→    >
+   900→      <div className="flex items-center justify-between mb-3">
+   901→        <div className="flex items-center gap-2">
+   902→          <Wifi className="h-4 w-4 text-violet-400" />
+   903→          <h3 className="text-sm font-medium text-zinc-200">
+   904→            Discovered {results.length} local {results.length === 1 ? 'server' : 'servers'}
+   905→          </h3>
+   906→        </div>
+   907→        <Button
+   908→          variant="ghost"
+   909→          size="sm"
+   910→          className="h-7 text-xs text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+   911→          onClick={onDismiss}
+   912→        >
+   913→          <X className="h-3 w-3 mr-1" />
+   914→          Dismiss
+   915→        </Button>
+   916→      </div>
+   917→
+   918→      <AnimatePresence>
+   919→        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+   920→          {results.map((result, i) => {
+   921→            const visual = PROVIDER_VISUALS[result.type as ProviderType] ?? PROVIDER_VISUALS.custom;
+   922→            const Icon = visual.icon;
+   923→
+   924→            return (
+   925→              <motion.div
+   926→                key={result.port}
+   927→                custom={i}
+   928→                variants={discoveryCardVariants}
+   929→                initial="hidden"
+   930→                animate="visible"
+   931→                exit="exit"
+   932→              >
+   933→                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-4">
+   934→                  <div className="flex items-start gap-3">
+   935→                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${visual.bg}`}>
+   936→                      <Icon className={`h-4 w-4 ${visual.color}`} />
+   937→                    </div>
+   938→                    <div className="flex-1 min-w-0">
+   939→                      <div className="flex items-center gap-2">
+   940→                        <span className="text-sm font-medium text-zinc-200">{result.name}</span>
+   941→                        <Badge className="text-[10px] h-5 px-1.5 py-0 bg-emerald-500/15 text-emerald-400 border-emerald-500/25 font-normal">
+   942→                          <Check className="h-2.5 w-2.5 mr-0.5" />
+   943→                          Found
+   944→                        </Badge>
+   945→                      </div>
+   946→                      <p className="text-xs text-zinc-500 mt-0.5">
+   947→                        Port {result.port} • {result.models.length} model{result.models.length !== 1 ? 's' : ''} available
+   948→                      </p>
+   949→
+   950→                      {/* Model badges */}
+   951→                      {result.models.length > 0 && (
+   952→                        <div className="flex flex-wrap gap-1 mt-2 max-h-20 overflow-y-auto">
+   953→                          {result.models.slice(0, 4).map((model) => (
+   954→                            <Badge
+   955→                              key={model}
+   956→                              variant="secondary"
+   957→                              className="text-[10px] px-1.5 py-0 h-5 bg-zinc-800 text-zinc-400 font-normal"
+   958→                            >
+   959→                              {model.length > 20 ? model.slice(0, 20) + '…' : model}
+   960→                            </Badge>
+   961→                          ))}
+   962→                          {result.models.length > 4 && (
+   963→                            <Badge
+   964→                              variant="secondary"
+   965→                              className="text-[10px] px-1.5 py-0 h-5 bg-zinc-800 text-zinc-500 font-normal"
+   966→                            >
+   967→                              +{result.models.length - 4} more
+   968→                            </Badge>
+   969→                          )}
+   970→                        </div>
+   971→                      )}
+   972→
+   973→                      <Button
+   974→                        size="sm"
+   975→                        className="mt-3 h-7 text-xs bg-violet-600 hover:bg-violet-500 text-white"
+   976→                        onClick={() => onAdd(result)}
+   977→                      >
+   978→                        <Plus className="h-3 w-3 mr-1" />
+   979→                        Add as Provider
+   980→                      </Button>
+   981→                    </div>
+   982→                  </div>
+   983→                </div>
+   984→              </motion.div>
+   985→            );
+   986→          })}
+   987→        </div>
+   988→      </AnimatePresence>
+   989→    </motion.div>
+   990→  );
+   991→}
+   992→
+   993→// =============================================================================
+   994→// Main Provider Manager Component
+   995→// =============================================================================
+   996→
+   997→export function ProviderManager() {
+   998→  const {
+   999→    providers,
+  1000→    loading,
+  1001→    error,
+  1002→    fetchProviders,
+  1003→    addProvider,
+  1004→    updateProvider,
+  1005→    deleteProvider,
+  1006→    testProvider,
+  1007→  } = useProviderStore();
+  1008→
+  1009→  // Dialog states
+  1010→  const [formOpen, setFormOpen] = useState(false);
+  1011→  const [editingProvider, setEditingProvider] = useState<LlmProvider | null>(null);
+  1012→  const [deleteTarget, setDeleteTarget] = useState<LlmProvider | null>(null);
+  1013→  const [deleting, setDeleting] = useState(false);
+  1014→  const [testingId, setTestingId] = useState<string | null>(null);
+  1015→
+  1016→  // Discovery state
+  1017→  const [discovering, setDiscovering] = useState(false);
+  1018→  const [discovered, setDiscovered] = useState<DiscoveredProvider[]>([]);
+  1019→
+  1020→  // Fetch providers on mount
+  1021→  useEffect(() => {
+  1022→    fetchProviders();
+  1023→  }, [fetchProviders]);
+  1024→
+  1025→  // Show error toast
+  1026→  useEffect(() => {
+  1027→    if (error) {
+  1028→      toast.error('Provider error', { description: error });
+  1029→    }
+  1030→  }, [error]);
+  1031→
+  1032→  // ---- Handlers ----
+  1033→
+  1034→  const handleOpenAdd = useCallback(() => {
+  1035→    setEditingProvider(null);
+  1036→    setFormOpen(true);
+  1037→  }, []);
+  1038→
+  1039→  const handleOpenEdit = useCallback((provider: LlmProvider) => {
+  1040→    setEditingProvider(provider);
+  1041→    setFormOpen(true);
+  1042→  }, []);
+  1043→
+  1044→  const handleSave = useCallback(
+  1045→    async (data: ProviderFormData) => {
+  1046→      const typeDef = PROVIDER_TYPES.find((t) => t.value === data.type);
+  1047→
+  1048→      if (editingProvider) {
+  1049→        await updateProvider(editingProvider.id, {
+  1050→          name: data.name,
+  1051→          type: data.type,
+  1052→          baseUrl: data.baseUrl,
+  1053→          apiKey: data.apiKey,
+  1054→          isLocal: typeDef?.isLocal ?? false,
+  1055→          isActive: data.isActive,
+  1056→          models: data.models,
+  1057→        });
+  1058→      } else {
+  1059→        await addProvider({
+  1060→          name: data.name,
+  1061→          type: data.type,
+  1062→          baseUrl: data.baseUrl,
+  1063→          apiKey: data.apiKey,
+  1064→          isLocal: typeDef?.isLocal ?? false,
+  1065→          isActive: data.isActive,
+  1066→          models: data.models,
+  1067→        });
+  1068→      }
+  1069→    },
+  1070→    [editingProvider, addProvider, updateProvider]
+  1071→  );
+  1072→
+  1073→  const handleDelete = useCallback(async () => {
+  1074→    if (!deleteTarget) return;
+  1075→    setDeleting(true);
+  1076→    try {
+  1077→      await deleteProvider(deleteTarget.id);
+  1078→      toast.success('Provider deleted', {
+  1079→        description: `${deleteTarget.name} has been removed.`,
+  1080→      });
+  1081→      setDeleteTarget(null);
+  1082→    } catch (err) {
+  1083→      toast.error('Failed to delete provider', {
+  1084→        description: err instanceof Error ? err.message : 'Unknown error',
+  1085→      });
+  1086→    } finally {
+  1087→      setDeleting(false);
+  1088→    }
+  1089→  }, [deleteTarget, deleteProvider]);
+  1090→
+  1091→  const handleTest = useCallback(
+  1092→    async (id: string) => {
+  1093→      setTestingId(id);
+  1094→      try {
+  1095→        const success = await testProvider(id);
+  1096→        const provider = providers.find((p) => p.id === id);
+  1097→        if (success) {
+  1098→          toast.success('Connection successful', {
+  1099→            description: `${provider?.name ?? 'Provider'} is reachable and responding.`,
+  1100→          });
+  1101→        } else {
+  1102→          toast.error('Connection failed', {
+  1103→            description: `Could not reach ${provider?.name ?? 'provider'}. Check the URL and API key.`,
+  1104→          });
+  1105→        }
+  1106→      } catch {
+  1107→        toast.error('Connection test error', {
+  1108→          description: 'An unexpected error occurred during the test.',
+  1109→        });
+  1110→      } finally {
+  1111→        setTestingId(null);
+  1112→      }
+  1113→    },
+  1114→    [testProvider, providers]
+  1115→  );
+  1116→
+  1117→  const handleDiscover = useCallback(async () => {
+  1118→    setDiscovering(true);
+  1119→    setDiscovered([]);
+  1120→    try {
+  1121→      const res = await fetch('/api/discover');
+  1122→      if (!res.ok) {
+  1123→        throw new Error('Discovery request failed');
+  1124→      }
+  1125→      const results: DiscoveredProvider[] = await res.json();
+  1126→      setDiscovered(results);
+  1127→
+  1128→      if (results.length === 0) {
+  1129→        toast.info('No local servers found', {
+  1130→          description:
+  1131→            'Make sure Ollama, LM Studio, vLLM, or another local server is running on its default port.',
+  1132→        });
+  1133→      } else {
+  1134→        toast.success(`Found ${results.length} local ${results.length === 1 ? 'server' : 'servers'}`, {
+  1135→          description: 'Select which ones you\'d like to add as providers.',
+  1136→        });
+  1137→      }
+  1138→    } catch (err) {
+  1139→      toast.error('Discovery failed', {
+  1140→        description: err instanceof Error ? err.message : 'Could not scan for local servers.',
+  1141→      });
+  1142→    } finally {
+  1143→      setDiscovering(false);
+  1144→    }
+  1145→  }, []);
+  1146→
+  1147→  const handleAddDiscovered = useCallback(
+  1148→    (result: DiscoveredProvider) => {
+  1149→      const typeDef = PROVIDER_TYPES.find((t) => t.value === result.type);
+  1150→      addProvider({
+  1151→        name: `${result.name} (Local)`,
+  1152→        type: result.type as ProviderType,
+  1153→        baseUrl: result.baseUrl,
+  1154→        apiKey: '',
+  1155→        isLocal: true,
+  1156→        isActive: true,
+  1157→        models: result.models,
+  1158→      }).then(() => {
+  1159→        setDiscovered((prev) => prev.filter((r) => r.port !== result.port));
+  1160→        toast.success(`${result.name} added`, {
+  1161→          description: `Added with ${result.models.length} model(s) on port ${result.port}.`,
+  1162→        });
+  1163→      }).catch((err) => {
+  1164→        toast.error('Failed to add discovered provider', {
+  1165→          description: err instanceof Error ? err.message : 'Unknown error',
+  1166→        });
+  1167→      });
+  1168→    },
+  1169→    [addProvider]
+  1170→  );
+  1171→
+  1172→  // ---- Render ----
+  1173→
+  1174→  return (
+  1175→    <div className="h-full overflow-y-auto">
+  1176→      <div className="max-w-6xl mx-auto p-6 space-y-6">
+  1177→        {/* Header */}
+  1178→        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+  1179→          <div className="flex items-center gap-3">
+  1180→            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-500/10 border border-violet-500/20">
+  1181→              <Server className="h-5 w-5 text-violet-400" />
+  1182→            </div>
+  1183→            <div>
+  1184→              <h1 className="text-xl font-bold text-zinc-100 tracking-tight">Model Gateway</h1>
+  1185→              <p className="text-sm text-zinc-400 mt-0.5">
+  1186→                Configure LLM providers for your agents
+  1187→              </p>
+  1188→            </div>
+  1189→          </div>
+  1190→
+  1191→          <div className="flex items-center gap-2 shrink-0">
+  1192→            <Button
+  1193→              variant="outline"
+  1194→              onClick={handleDiscover}
+  1195→              disabled={discovering}
+  1196→              className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100 gap-2"
+  1197→            >
+  1198→              {discovering ? (
+  1199→                <Loader2 className="h-4 w-4 animate-spin" />
+  1200→              ) : (
+  1201→                <Wifi className="h-4 w-4" />
+  1202→              )}
+  1203→              Discover Local
+  1204→            </Button>
+  1205→            <Button
+  1206→              onClick={handleOpenAdd}
+  1207→              className="bg-violet-600 hover:bg-violet-500 text-white gap-2"
+  1208→            >
+  1209→              <Plus className="h-4 w-4" />
+  1210→              Add Provider
+  1211→            </Button>
+  1212→          </div>
+  1213→        </div>
+  1214→
+  1215→        {/* Discovery results */}
+  1216→        <AnimatePresence>
+  1217→          {discovered.length > 0 && (
+  1218→            <DiscoveryResults
+  1219→              results={discovered}
+  1220→              onAdd={handleAddDiscovered}
+  1221→              onDismiss={() => setDiscovered([])}
+  1222→            />
+  1223→          )}
+  1224→        </AnimatePresence>
+  1225→
+  1226→        {/* Content */}
+  1227→        {loading && providers.length === 0 ? (
+  1228→          <ProviderSkeletonGrid />
+  1229→        ) : providers.length === 0 ? (
+  1230→          <EmptyState onAdd={handleOpenAdd} />
+  1231→        ) : (
+  1232→          <AnimatePresence mode="popLayout">
+  1233→            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+  1234→              {providers.map((provider, i) => (
+  1235→                <ProviderCard
+  1236→                  key={provider.id}
+  1237→                  provider={provider}
+  1238→                  index={i}
+  1239→                  onEdit={handleOpenEdit}
+  1240→                  onTest={handleTest}
+  1241→                  onDelete={setDeleteTarget}
+  1242→                  testingId={testingId}
+  1243→                />
+  1244→              ))}
+  1245→            </div>
+  1246→          </AnimatePresence>
+  1247→        )}
+  1248→      </div>
+  1249→
+  1250→      {/* Form Dialog */}
+  1251→      <ProviderFormDialog
+  1252→        open={formOpen}
+  1253→        onOpenChange={setFormOpen}
+  1254→        editingProvider={editingProvider}
+  1255→        onSave={handleSave}
+  1256→      />
+  1257→
+  1258→      {/* Delete Confirmation */}
+  1259→      <DeleteConfirmDialog
+  1260→        open={deleteTarget !== null}
+  1261→        onOpenChange={(open) => !open && setDeleteTarget(null)}
+  1262→        provider={deleteTarget}
+  1263→        onConfirm={handleDelete}
+  1264→        deleting={deleting}
+  1265→      />
+  1266→    </div>
+  1267→  );
+  1268→}
+  1269→

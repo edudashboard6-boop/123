@@ -1,0 +1,990 @@
+     1→'use client';
+     2→
+     3→import React, {
+     4→  useState,
+     5→  useCallback,
+     6→  useEffect,
+     7→  useRef,
+     8→  useMemo,
+     9→  type ElementType,
+    10→} from 'react';
+    11→import { toast } from 'sonner';
+    12→import {
+    13→  Bot,
+    14→  Hammer,
+    15→  Shield,
+    16→  Eye,
+    17→  PenTool,
+    18→  ChevronDown,
+    19→  ChevronRight,
+    20→  RotateCcw,
+    21→  Plus,
+    22→  X,
+    23→  Settings,
+    24→  Info,
+    25→  Zap,
+    26→  Save,
+    27→  ExternalLink,
+    28→  Trash2,
+    29→  GripVertical,
+    30→  Users,
+    31→} from 'lucide-react';
+    32→
+    33→import { Card, CardContent } from '@/components/ui/card';
+    34→import { Button } from '@/components/ui/button';
+    35→import {
+    36→  Select,
+    37→  SelectContent,
+    38→  SelectGroup,
+    39→  SelectItem,
+    40→  SelectLabel,
+    41→  SelectSeparator,
+    42→  SelectTrigger,
+    43→  SelectValue,
+    44→} from '@/components/ui/select';
+    45→import { Slider } from '@/components/ui/slider';
+    46→import { Switch } from '@/components/ui/switch';
+    47→import { Badge } from '@/components/ui/badge';
+    48→import { Label } from '@/components/ui/label';
+    49→import { Textarea } from '@/components/ui/textarea';
+    50→import { Checkbox } from '@/components/ui/checkbox';
+    51→import {
+    52→  Collapsible,
+    53→  CollapsibleContent,
+    54→  CollapsibleTrigger,
+    55→} from '@/components/ui/collapsible';
+    56→import {
+    57→  Tooltip,
+    58→  TooltipContent,
+    59→  TooltipTrigger,
+    60→} from '@/components/ui/tooltip';
+    61→import { Separator } from '@/components/ui/separator';
+    62→import { Skeleton } from '@/components/ui/skeleton';
+    63→import { Input } from '@/components/ui/input';
+    64→import { ScrollArea } from '@/components/ui/scroll-area';
+    65→
+    66→import { useAgentStore } from '@/stores/agent-store';
+    67→import { useProviderStore } from '@/stores/provider-store';
+    68→import { useUiStore } from '@/stores/ui-store';
+    69→import { DEFAULT_AGENTS, BUILT_IN_TOOLS } from '@/lib/constants';
+    70→import type { AgentId, AgentConfig, LlmProvider } from '@/lib/types';
+    71→
+    72→// =============================================================================
+    73→// Constants & Mappings
+    74→// =============================================================================
+    75→
+    76→const AGENT_ICONS: Record<AgentId, ElementType> = {
+    77→  architect: Bot,
+    78→  forge: Hammer,
+    79→  sentinel: Shield,
+    80→  perception: Eye,
+    81→  scribe: PenTool,
+    82→};
+    83→
+    84→const AGENT_STYLES: Record<
+    85→  AgentId,
+    86→  { borderColor: string; bgGradient: string; iconBg: string; accentText: string; badgeVariant: string }
+    87→> = {
+    88→  architect: {
+    89→    borderColor: 'border-l-violet-500/60',
+    90→    bgGradient: 'bg-gradient-to-br from-violet-500/[0.04] to-transparent',
+    91→    iconBg: 'bg-violet-500/15',
+    92→    accentText: 'text-violet-400',
+    93→    badgeVariant: 'bg-violet-500/15 text-violet-300 border-violet-500/20',
+    94→  },
+    95→  forge: {
+    96→    borderColor: 'border-l-blue-500/60',
+    97→    bgGradient: 'bg-gradient-to-br from-blue-500/[0.04] to-transparent',
+    98→    iconBg: 'bg-blue-500/15',
+    99→    accentText: 'text-blue-400',
+   100→    badgeVariant: 'bg-blue-500/15 text-blue-300 border-blue-500/20',
+   101→  },
+   102→  sentinel: {
+   103→    borderColor: 'border-l-red-500/60',
+   104→    bgGradient: 'bg-gradient-to-br from-red-500/[0.04] to-transparent',
+   105→    iconBg: 'bg-red-500/15',
+   106→    accentText: 'text-red-400',
+   107→    badgeVariant: 'bg-red-500/15 text-red-300 border-red-500/20',
+   108→  },
+   109→  perception: {
+   110→    borderColor: 'border-l-amber-500/60',
+   111→    bgGradient: 'bg-gradient-to-br from-amber-500/[0.04] to-transparent',
+   112→    iconBg: 'bg-amber-500/15',
+   113→    accentText: 'text-amber-400',
+   114→    badgeVariant: 'bg-amber-500/15 text-amber-300 border-amber-500/20',
+   115→  },
+   116→  scribe: {
+   117→    borderColor: 'border-l-green-500/60',
+   118→    bgGradient: 'bg-gradient-to-br from-green-500/[0.04] to-transparent',
+   119→    iconBg: 'bg-green-500/15',
+   120→    accentText: 'text-green-400',
+   121→    badgeVariant: 'bg-green-500/15 text-green-300 border-green-500/20',
+   122→  },
+   123→};
+   124→
+   125→const TOOL_CATEGORIES: Record<string, string> = {
+   126→  information: 'Information',
+   127→  filesystem: 'Filesystem',
+   128→  devops: 'DevOps',
+   129→  system: 'System',
+   130→  quality: 'Quality',
+   131→  perception: 'Perception',
+   132→  data: 'Data',
+   133→  knowledge: 'Knowledge',
+   134→};
+   135→
+   136→const AGENT_ORDER: AgentId[] = ['architect', 'forge', 'sentinel', 'perception', 'scribe'];
+   137→
+   138→// =============================================================================
+   139→// Debounce hook
+   140→// =============================================================================
+   141→
+   142→function useDebouncedCallback<T extends (...args: unknown[]) => unknown>(
+   143→  callback: T,
+   144→  delay: number,
+   145→): T {
+   146→  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   147→  const callbackRef = useRef(callback);
+   148→
+   149→  useEffect(() => {
+   150→    callbackRef.current = callback;
+   151→  }, [callback]);
+   152→
+   153→  const debounced = useCallback(
+   154→    (...args: Parameters<T>) => {
+   155→      if (timerRef.current) clearTimeout(timerRef.current);
+   156→      timerRef.current = setTimeout(() => callbackRef.current(...args), delay);
+   157→    },
+   158→    [delay],
+   159→  ) as T;
+   160→
+   161→  useEffect(() => {
+   162→    return () => {
+   163→      if (timerRef.current) clearTimeout(timerRef.current);
+   164→    };
+   165→  }, []);
+   166→
+   167→  return debounced;
+   168→}
+   169→
+   170→// =============================================================================
+   171→// Agent Card Component
+   172→// =============================================================================
+   173→
+   174→interface AgentCardProps {
+   175→  agent: AgentConfig;
+   176→  providers: LlmProvider[];
+   177→  onUpdate: (agentId: string, data: Partial<AgentConfig>) => Promise<void>;
+   178→  onNavigateToProviders: () => void;
+   179→}
+   180→
+   181→function AgentCard({ agent, providers, onUpdate, onNavigateToProviders }: AgentCardProps) {
+   182→  const [cardExpanded, setCardExpanded] = useState(true);
+   183→  const [paramsOpen, setParamsOpen] = useState(false);
+   184→  const [promptOpen, setPromptOpen] = useState(false);
+   185→  const [toolsOpen, setToolsOpen] = useState(false);
+   186→  const [localPrompt, setLocalPrompt] = useState(agent.systemPrompt);
+   187→  const [fallbackIds, setFallbackIds] = useState<string[]>([]);
+   188→
+   189→  const defaultDef = useMemo(
+   190→    () => DEFAULT_AGENTS.find((d) => d.agentId === agent.agentId),
+   191→    [agent.agentId],
+   192→  );
+   193→
+   194→  const style = AGENT_STYLES[agent.agentId];
+   195→  const IconComponent = AGENT_ICONS[agent.agentId];
+   196→  const availableProviders = providers.filter((p) => p.isActive);
+   197→
+   198→  const selectedProvider = useMemo(
+   199→    () => providers.find((p) => p.id === agent.providerId),
+   200→    [providers, agent.providerId],
+   201→  );
+   202→
+   203→  const availableModels = useMemo(
+   204→    () => selectedProvider?.models ?? [],
+   205→    [selectedProvider],
+   206→  );
+   207→
+   208→  // Debounced save for temperature & max tokens
+   209→  const debouncedSave = useDebouncedCallback(
+   210→    async (data: Partial<AgentConfig>) => {
+   211→      try {
+   212→        await onUpdate(agent.agentId, data);
+   213→      } catch {
+   214→        toast.error(`Failed to save ${agent.name} parameters`);
+   215→      }
+   216→    },
+   217→    600,
+   218→  );
+   219→
+   220→  const handleProviderChange = useCallback(
+   221→    async (providerId: string) => {
+   222→      try {
+   223→        const provider = providers.find((p) => p.id === providerId);
+   224→        const firstModel = provider?.models?.[0] ?? '';
+   225→        await onUpdate(agent.agentId, {
+   226→          providerId,
+   227→          modelId: firstModel,
+   228→        });
+   229→        toast.success(`${agent.name} provider updated`);
+   230→      } catch {
+   231→        toast.error(`Failed to update ${agent.name} provider`);
+   232→      }
+   233→    },
+   234→    [agent.agentId, agent.name, onUpdate, providers],
+   235→  );
+   236→
+   237→  const handleModelChange = useCallback(
+   238→    async (modelId: string) => {
+   239→      try {
+   240→        await onUpdate(agent.agentId, { modelId });
+   241→        toast.success(`${agent.name} model updated`);
+   242→      } catch {
+   243→        toast.error(`Failed to update ${agent.name} model`);
+   244→      }
+   245→    },
+   246→    [agent.agentId, agent.name, onUpdate],
+   247→  );
+   248→
+   249→  const handleTemperatureChange = useCallback(
+   250→    (value: number[]) => {
+   251→      const temp = value[0];
+   252→      debouncedSave({ temperature: temp });
+   253→    },
+   254→    [debouncedSave],
+   255→  );
+   256→
+   257→  const handleMaxTokensChange = useCallback(
+   258→    (e: React.ChangeEvent<HTMLInputElement>) => {
+   259→      let val = parseInt(e.target.value, 10);
+   260→      if (isNaN(val)) val = 4096;
+   261→      val = Math.max(256, Math.min(131072, val));
+   262→      debouncedSave({ maxTokens: val });
+   263→    },
+   264→    [debouncedSave],
+   265→  );
+   266→
+   267→  const handlePromptBlur = useCallback(async () => {
+   268→    if (localPrompt !== agent.systemPrompt) {
+   269→      try {
+   270→        await onUpdate(agent.agentId, { systemPrompt: localPrompt });
+   271→        toast.success(`${agent.name} prompt saved`);
+   272→      } catch {
+   273→        toast.error(`Failed to save ${agent.name} prompt`);
+   274→      }
+   275→    }
+   276→  }, [agent.agentId, agent.name, agent.systemPrompt, localPrompt, onUpdate]);
+   277→
+   278→  const handlePromptReset = useCallback(async () => {
+   279→    if (!defaultDef) return;
+   280→    setLocalPrompt(defaultDef.systemPrompt);
+   281→    try {
+   282→      await onUpdate(agent.agentId, { systemPrompt: defaultDef.systemPrompt });
+   283→      toast.success(`${agent.name} prompt reset to default`);
+   284→    } catch {
+   285→      toast.error(`Failed to reset ${agent.name} prompt`);
+   286→    }
+   287→  }, [agent.agentId, agent.name, defaultDef, onUpdate]);
+   288→
+   289→  const handleToolToggle = useCallback(
+   290→    async (toolId: string, checked: boolean) => {
+   291→      const newTools = checked
+   292→        ? [...agent.tools, toolId]
+   293→        : agent.tools.filter((t) => t !== toolId);
+   294→      try {
+   295→        await onUpdate(agent.agentId, { tools: newTools });
+   296→        toast.success(
+   297→          `${toolId} ${checked ? 'enabled' : 'disabled'} for ${agent.name}`,
+   298→        );
+   299→      } catch {
+   300→        toast.error(`Failed to update tools for ${agent.name}`);
+   301→      }
+   302→    },
+   303→    [agent.agentId, agent.name, agent.tools, onUpdate],
+   304→  );
+   305→
+   306→  const handleActiveToggle = useCallback(
+   307→    async (checked: boolean) => {
+   308→      try {
+   309→        await onUpdate(agent.agentId, { is_active: checked });
+   310→        toast.success(`${agent.name} ${checked ? 'activated' : 'deactivated'}`);
+   311→      } catch {
+   312→        toast.error(`Failed to toggle ${agent.name}`);
+   313→      }
+   314→    },
+   315→    [agent.agentId, agent.name, onUpdate],
+   316→  );
+   317→
+   318→  const handleAddFallback = useCallback(
+   319→    (providerId: string) => {
+   320→      if (!fallbackIds.includes(providerId)) {
+   321→        setFallbackIds((prev) => [...prev, providerId]);
+   322→      }
+   323→    },
+   324→    [fallbackIds],
+   325→  );
+   326→
+   327→  const handleRemoveFallback = useCallback((providerId: string) => {
+   328→    setFallbackIds((prev) => prev.filter((id) => id !== providerId));
+   329→  }, []);
+   330→
+   331→  // Group tools by category
+   332→  const toolsByCategory = useMemo(() => {
+   333→    const groups: Record<string, typeof BUILT_IN_TOOLS> = {};
+   334→    for (const tool of BUILT_IN_TOOLS) {
+   335→      if (!groups[tool.category]) groups[tool.category] = [];
+   336→      groups[tool.category].push(tool);
+   337→    }
+   338→    return groups;
+   339→  }, []);
+   340→
+   341→  const fallbackProviders = providers.filter(
+   342→    (p) => p.isActive && p.id !== agent.providerId,
+   343→  );
+   344→
+   345→  return (
+   346→    <Collapsible open={cardExpanded} onOpenChange={setCardExpanded}>
+   347→      <Card
+   348→        className={
+   349→          'border-l-4 border border-zinc-800/60 border-l-transparent rounded-xl overflow-hidden transition-all duration-200 ' +
+   350→          style.borderColor +
+   351→          ' ' +
+   352→          (cardExpanded ? style.bgGradient : 'bg-zinc-900/50') +
+   353→          ' hover:border-zinc-700/60'
+   354→        }
+   355→      >
+   356→        {/* ── Card Header (always visible) ── */}
+   357→        <CollapsibleTrigger asChild>
+   358→          <button className="w-full text-left">
+   359→            <div className="flex items-start gap-3 p-4 pb-3">
+   360→              {/* Icon */}
+   361→              <div
+   362→                className={
+   363→                  'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ' +
+   364→                  style.iconBg
+   365→                }
+   366→              >
+   367→                <IconComponent className={'h-5 w-5 ' + style.accentText} />
+   368→              </div>
+   369→
+   370→              {/* Name + Description */}
+   371→              <div className="flex-1 min-w-0">
+   372→                <div className="flex items-center gap-2">
+   373→                  <span className="font-semibold text-zinc-100 text-sm">
+   374→                    {agent.name}
+   375→                  </span>
+   376→                  <Badge
+   377→                    variant="outline"
+   378→                    className={
+   379→                      'text-[10px] px-1.5 py-0 h-4 font-medium border ' +
+   380→                      style.badgeVariant
+   381→                    }
+   382→                  >
+   383→                    {agent.agentId.toUpperCase()}
+   384→                  </Badge>
+   385→                  {agent.is_active ? (
+   386→                    <Badge className="bg-emerald-500/15 text-emerald-400 border-emerald-500/20 text-[10px] px-1.5 py-0 h-4">
+   387→                      Active
+   388→                    </Badge>
+   389→                  ) : (
+   390→                    <Badge className="bg-zinc-500/15 text-zinc-500 border-zinc-500/20 text-[10px] px-1.5 py-0 h-4">
+   391→                      Inactive
+   392→                    </Badge>
+   393→                  )}
+   394→                </div>
+   395→                <p className="mt-1 text-xs text-zinc-500 leading-relaxed line-clamp-2">
+   396→                  {agent.description}
+   397→                </p>
+   398→              </div>
+   399→
+   400→              {/* Right side: toggle + chevron */}
+   401→              <div className="flex items-center gap-2 shrink-0">
+   402→                <div
+   403→                  className="flex items-center gap-2"
+   404→                  onClick={(e) => e.stopPropagation()}
+   405→                >
+   406→                  <Label
+   407→                    htmlFor={`active-${agent.agentId}`}
+   408→                    className="text-[11px] text-zinc-500 hidden sm:block"
+   409→                  >
+   410→                    Active
+   411→                  </Label>
+   412→                  <Switch
+   413→                    id={`active-${agent.agentId}`}
+   414→                    checked={agent.is_active}
+   415→                    onCheckedChange={handleActiveToggle}
+   416→                    className="data-[state=checked]:bg-violet-600"
+   417→                  />
+   418→                </div>
+   419→                {cardExpanded ? (
+   420→                  <ChevronDown className="h-4 w-4 text-zinc-500" />
+   421→                ) : (
+   422→                  <ChevronRight className="h-4 w-4 text-zinc-500" />
+   423→                )}
+   424→              </div>
+   425→            </div>
+   426→          </button>
+   427→        </CollapsibleTrigger>
+   428→
+   429→        {/* ── Expandable Card Body ── */}
+   430→        <CollapsibleContent>
+   431→          <div className="px-4 pb-4">
+   432→            <Separator className="bg-zinc-800/60 mb-4" />
+   433→
+   434→            {/* ── Provider & Model Selection (KEY FEATURE) ── */}
+   435→            <section className="space-y-3">
+   436→              <div className="flex items-center gap-2 mb-1">
+   437→                <Zap className={'h-3.5 w-3.5 ' + style.accentText} />
+   438→                <span className="text-xs font-medium text-zinc-300">
+   439→                  Provider & Model
+   440→                </span>
+   441→              </div>
+   442→
+   443→              {availableProviders.length === 0 ? (
+   444→                <div className="rounded-lg border border-dashed border-zinc-700 bg-zinc-900/50 p-4 text-center">
+   445→                  <p className="text-xs text-zinc-500 mb-2">
+   446→                    No providers configured yet
+   447→                  </p>
+   448→                  <Button
+   449→                    variant="outline"
+   450→                    size="sm"
+   451→                    className="text-xs h-7 border-zinc-700 text-zinc-300 hover:bg-zinc-800 hover:text-zinc-100"
+   452→                    onClick={(e) => {
+   453→                      e.stopPropagation();
+   454→                      onNavigateToProviders();
+   455→                    }}
+   456→                  >
+   457→                    <ExternalLink className="h-3 w-3 mr-1.5" />
+   458→                    Go to Providers
+   459→                  </Button>
+   460→                </div>
+   461→              ) : (
+   462→                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   463→                  {/* Provider Select */}
+   464→                  <div className="space-y-1.5">
+   465→                    <Label className="text-[11px] text-zinc-500 uppercase tracking-wider">
+   466→                      Provider
+   467→                    </Label>
+   468→                    <Select
+   469→                      value={agent.providerId || undefined}
+   470→                      onValueChange={handleProviderChange}
+   471→                    >
+   472→                      <SelectTrigger className="w-full h-9 bg-zinc-900/80 border-zinc-700/60 text-zinc-200 text-sm focus:ring-violet-500/20 focus:border-violet-500/40">
+   473→                        <SelectValue placeholder="Select provider..." />
+   474→                      </SelectTrigger>
+   475→                      <SelectContent className="bg-zinc-900 border-zinc-700">
+   476→                        {availableProviders.map((p) => (
+   477→                          <SelectItem
+   478→                            key={p.id}
+   479→                            value={p.id}
+   480→                            className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
+   481→                          >
+   482→                            <span className="flex items-center gap-2">
+   483→                              {p.name}
+   484→                              <Badge
+   485→                                variant="outline"
+   486→                                className={
+   487→                                  'text-[9px] px-1 py-0 h-3.5 ml-1 border ' +
+   488→                                  (p.isLocal
+   489→                                    ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+   490→                                    : 'bg-sky-500/10 text-sky-400 border-sky-500/20')
+   491→                                }
+   492→                              >
+   493→                                {p.isLocal ? 'Local' : 'Cloud'}
+   494→                              </Badge>
+   495→                            </span>
+   496→                          </SelectItem>
+   497→                        ))}
+   498→                      </SelectContent>
+   499→                    </Select>
+   500→
+   501→                    {/* Provider badge below */}
+   502→                    {selectedProvider && (
+   503→                      <div className="flex items-center gap-1.5">
+   504→                        <Badge
+   505→                          variant="outline"
+   506→                          className={
+   507→                            'text-[9px] px-1.5 py-0 h-4 border ' +
+   508→                            (selectedProvider.isLocal
+   509→                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+   510→                              : 'bg-sky-500/10 text-sky-400 border-sky-500/20')
+   511→                          }
+   512→                        >
+   513→                          {selectedProvider.isLocal ? 'Local' : 'Cloud'}
+   514→                        </Badge>
+   515→                        <span className="text-[10px] text-zinc-600">
+   516→                          {selectedProvider.models.length} models available
+   517→                        </span>
+   518→                      </div>
+   519→                    )}
+   520→                  </div>
+   521→
+   522→                  {/* Model Select */}
+   523→                  <div className="space-y-1.5">
+   524→                    <Label className="text-[11px] text-zinc-500 uppercase tracking-wider">
+   525→                      Model
+   526→                    </Label>
+   527→                    <Select
+   528→                      value={agent.modelId || undefined}
+   529→                      onValueChange={handleModelChange}
+   530→                      disabled={!agent.providerId || availableModels.length === 0}
+   531→                    >
+   532→                      <SelectTrigger className="w-full h-9 bg-zinc-900/80 border-zinc-700/60 text-zinc-200 text-sm focus:ring-violet-500/20 focus:border-violet-500/40">
+   533→                        <SelectValue placeholder="Select model..." />
+   534→                      </SelectTrigger>
+   535→                      <SelectContent className="bg-zinc-900 border-zinc-700">
+   536→                        {availableModels.map((model) => (
+   537→                          <SelectItem
+   538→                            key={model}
+   539→                            value={model}
+   540→                            className="text-zinc-300 focus:bg-zinc-800 focus:text-zinc-100"
+   541→                          >
+   542→                            {model}
+   543→                          </SelectItem>
+   544→                        ))}
+   545→                        {availableModels.length === 0 && agent.providerId && (
+   546→                          <div className="px-2 py-3 text-center text-xs text-zinc-500">
+   547→                            No models configured for this provider
+   548→                          </div>
+   549→                        )}
+   550→                      </SelectContent>
+   551→                    </Select>
+   552→
+   553→                    {/* Current model info */}
+   554→                    {agent.modelId && (
+   555→                      <p className="text-[10px] text-zinc-600 truncate">
+   556→                        {selectedProvider?.name}: {agent.modelId}
+   557→                      </p>
+   558→                    )}
+   559→                  </div>
+   560→                </div>
+   561→              )}
+   562→
+   563→              {/* ── Fallback Chain (bonus) ── */}
+   564→              {availableProviders.length > 1 && (
+   565→                <div className="mt-2">
+   566→                  <Collapsible>
+   567→                    <CollapsibleTrigger className="flex items-center gap-1.5 text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors">
+   568→                      <GripVertical className="h-3 w-3" />
+   569→                      <span>Fallback Chain</span>
+   570→                      <ChevronDown className="h-3 w-3" />
+   571→                    </CollapsibleTrigger>
+   572→                    <CollapsibleContent>
+   573→                      <div className="mt-2 space-y-2 rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-3">
+   574→                        {fallbackIds.length === 0 ? (
+   575→                          <p className="text-[10px] text-zinc-600">
+   576→                            No fallback providers configured.
+   577→                          </p>
+   578→                        ) : (
+   579→                          <div className="space-y-1.5">
+   580→                            {fallbackIds.map((fId) => {
+   581→                              const fp = providers.find((p) => p.id === fId);
+   582→                              return (
+   583→                                <div
+   584→                                  key={fId}
+   585→                                  className="flex items-center justify-between gap-2 rounded-md bg-zinc-900/60 px-2.5 py-1.5"
+   586→                                >
+   587→                                  <span className="text-xs text-zinc-400">
+   588→                                    {fp?.name ?? fId}
+   589→                                  </span>
+   590→                                  <Button
+   591→                                    variant="ghost"
+   592→                                    size="sm"
+   593→                                    className="h-5 w-5 p-0 text-zinc-500 hover:text-red-400 hover:bg-red-500/10"
+   594→                                    onClick={() => handleRemoveFallback(fId)}
+   595→                                  >
+   596→                                    <X className="h-3 w-3" />
+   597→                                  </Button>
+   598→                                </div>
+   599→                              );
+   600→                            })}
+   601→                          </div>
+   602→                        )}
+   603→                        <Select onValueChange={handleAddFallback}>
+   604→                          <SelectTrigger className="h-7 text-[11px] bg-zinc-900/80 border-zinc-700/50 text-zinc-500">
+   605→                            <SelectValue placeholder="Add fallback provider..." />
+   606→                          </SelectTrigger>
+   607→                          <SelectContent className="bg-zinc-900 border-zinc-700">
+   608→                            {fallbackProviders
+   609→                              .filter((p) => !fallbackIds.includes(p.id))
+   610→                              .map((p) => (
+   611→                                <SelectItem
+   612→                                  key={p.id}
+   613→                                  value={p.id}
+   614→                                  className="text-xs text-zinc-300 focus:bg-zinc-800"
+   615→                                >
+   616→                                  {p.name}
+   617→                                </SelectItem>
+   618→                              ))}
+   619→                          </SelectContent>
+   620→                        </Select>
+   621→                      </div>
+   622→                    </CollapsibleContent>
+   623→                  </Collapsible>
+   624→                </div>
+   625→              )}
+   626→            </section>
+   627→
+   628→            <Separator className="bg-zinc-800/40 my-4" />
+   629→
+   630→            {/* ── Model Parameters (collapsible) ── */}
+   631→            <Collapsible open={paramsOpen} onOpenChange={setParamsOpen}>
+   632→              <CollapsibleTrigger className="flex items-center justify-between w-full group">
+   633→                <div className="flex items-center gap-2">
+   634→                  <Settings className="h-3.5 w-3.5 text-zinc-500" />
+   635→                  <span className="text-xs font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">
+   636→                    Model Parameters
+   637→                  </span>
+   638→                </div>
+   639→                <div className="flex items-center gap-1.5">
+   640→                  <span className="text-[10px] text-zinc-600">
+   641→                    {agent.temperature.toFixed(1)} / {agent.maxTokens.toLocaleString()}
+   642→                  </span>
+   643→                  {paramsOpen ? (
+   644→                    <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+   645→                  ) : (
+   646→                    <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
+   647→                  )}
+   648→                </div>
+   649→              </CollapsibleTrigger>
+   650→              <CollapsibleContent>
+   651→                <div className="mt-3 space-y-4 rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-3">
+   652→                  {/* Temperature */}
+   653→                  <div className="space-y-2.5">
+   654→                    <div className="flex items-center justify-between">
+   655→                      <Label className="text-[11px] text-zinc-500 uppercase tracking-wider">
+   656→                        Temperature
+   657→                      </Label>
+   658→                      <span className={
+   659→                        'text-sm font-mono font-medium tabular-nums ' + style.accentText
+   660→                      }>
+   661→                        {agent.temperature.toFixed(1)}
+   662→                      </span>
+   663→                    </div>
+   664→                    <Slider
+   665→                      value={[agent.temperature]}
+   666→                      onValueChange={handleTemperatureChange}
+   667→                      min={0}
+   668→                      max={2}
+   669→                      step={0.1}
+   670→                      className="w-full [&_[data-slot=slider-range]]:bg-violet-500 [&_[data-slot=slider-thumb]]:border-violet-500"
+   671→                    />
+   672→                    <div className="flex justify-between text-[10px] text-zinc-600">
+   673→                      <span>Precise (0.0)</span>
+   674→                      <span>Creative (2.0)</span>
+   675→                    </div>
+   676→                  </div>
+   677→
+   678→                  <Separator className="bg-zinc-800/40" />
+   679→
+   680→                  {/* Max Tokens */}
+   681→                  <div className="space-y-2">
+   682→                    <div className="flex items-center justify-between">
+   683→                      <Label className="text-[11px] text-zinc-500 uppercase tracking-wider">
+   684→                        Max Tokens
+   685→                      </Label>
+   686→                      <span className="text-[10px] text-zinc-600">
+   687→                        256 – 131,072
+   688→                      </span>
+   689→                    </div>
+   690→                    <div className="flex items-center gap-2">
+   691→                      <Input
+   692→                        type="number"
+   693→                        min={256}
+   694→                        max={131072}
+   695→                        step={256}
+   696→                        value={agent.maxTokens}
+   697→                        onChange={handleMaxTokensChange}
+   698→                        className="h-8 bg-zinc-900/80 border-zinc-700/60 text-sm text-zinc-200 font-mono tabular-nums focus:ring-violet-500/20 focus:border-violet-500/40"
+   699→                      />
+   700→                      <Button
+   701→                        variant="ghost"
+   702→                        size="sm"
+   703→                        className="h-8 w-8 p-0 text-zinc-500 hover:text-zinc-300 shrink-0"
+   704→                        onClick={() => {
+   705→                          if (defaultDef) {
+   706→                            onUpdate(agent.agentId, {
+   707→                              maxTokens: defaultDef.defaultMaxTokens,
+   708→                            });
+   709→                          }
+   710→                        }}
+   711→                        title="Reset to default"
+   712→                      >
+   713→                        <RotateCcw className="h-3.5 w-3.5" />
+   714→                      </Button>
+   715→                    </div>
+   716→                  </div>
+   717→                </div>
+   718→              </CollapsibleContent>
+   719→            </Collapsible>
+   720→
+   721→            <Separator className="bg-zinc-800/40 my-4" />
+   722→
+   723→            {/* ── System Prompt (collapsible) ── */}
+   724→            <Collapsible open={promptOpen} onOpenChange={setPromptOpen}>
+   725→              <CollapsibleTrigger className="flex items-center justify-between w-full group">
+   726→                <div className="flex items-center gap-2">
+   727→                  <Save className="h-3.5 w-3.5 text-zinc-500" />
+   728→                  <span className="text-xs font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">
+   729→                    System Prompt
+   730→                  </span>
+   731→                </div>
+   732→                <div className="flex items-center gap-1.5">
+   733→                  <span className="text-[10px] text-zinc-600">
+   734→                    {localPrompt.length.toLocaleString()} chars
+   735→                  </span>
+   736→                  {promptOpen ? (
+   737→                    <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+   738→                  ) : (
+   739→                    <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
+   740→                  )}
+   741→                </div>
+   742→              </CollapsibleTrigger>
+   743→              <CollapsibleContent>
+   744→                <div className="mt-3 space-y-2 rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-3">
+   745→                  <Textarea
+   746→                    value={localPrompt}
+   747→                    onChange={(e) => setLocalPrompt(e.target.value)}
+   748→                    onBlur={handlePromptBlur}
+   749→                    rows={6}
+   750→                    className="w-full bg-zinc-900/80 border-zinc-700/60 text-sm text-zinc-300 leading-relaxed resize-y min-h-[100px] max-h-[300px] focus:ring-violet-500/20 focus:border-violet-500/40 placeholder:text-zinc-600"
+   751→                    placeholder="Enter system prompt..."
+   752→                  />
+   753→                  <div className="flex items-center justify-between">
+   754→                    <span className="text-[10px] text-zinc-600">
+   755→                      {localPrompt.length.toLocaleString()} characters
+   756→                    </span>
+   757→                    <Button
+   758→                      variant="ghost"
+   759→                      size="sm"
+   760→                      className="h-6 px-2 text-[10px] text-zinc-500 hover:text-zinc-300 gap-1"
+   761→                      onClick={handlePromptReset}
+   762→                    >
+   763→                      <RotateCcw className="h-3 w-3" />
+   764→                      Reset to Default
+   765→                    </Button>
+   766→                  </div>
+   767→                </div>
+   768→              </CollapsibleContent>
+   769→            </Collapsible>
+   770→
+   771→            <Separator className="bg-zinc-800/40 my-4" />
+   772→
+   773→            {/* ── Tool Permissions (collapsible) ── */}
+   774→            <Collapsible open={toolsOpen} onOpenChange={setToolsOpen}>
+   775→              <CollapsibleTrigger className="flex items-center justify-between w-full group">
+   776→                <div className="flex items-center gap-2">
+   777→                  <Info className="h-3.5 w-3.5 text-zinc-500" />
+   778→                  <span className="text-xs font-medium text-zinc-300 group-hover:text-zinc-100 transition-colors">
+   779→                    Tool Permissions
+   780→                  </span>
+   781→                </div>
+   782→                <div className="flex items-center gap-1.5">
+   783→                  <Badge
+   784→                    variant="outline"
+   785→                    className="text-[9px] px-1.5 py-0 h-4 border-zinc-700 text-zinc-500"
+   786→                  >
+   787→                    {agent.tools.length}/{BUILT_IN_TOOLS.length}
+   788→                  </Badge>
+   789→                  {toolsOpen ? (
+   790→                    <ChevronDown className="h-3.5 w-3.5 text-zinc-500" />
+   791→                  ) : (
+   792→                    <ChevronRight className="h-3.5 w-3.5 text-zinc-500" />
+   793→                  )}
+   794→                </div>
+   795→              </CollapsibleTrigger>
+   796→              <CollapsibleContent>
+   797→                <div className="mt-3 space-y-3 rounded-lg border border-zinc-800/60 bg-zinc-950/40 p-3">
+   798→                  {Object.entries(toolsByCategory).map(
+   799→                    ([category, tools]) => (
+   800→                      <div key={category}>
+   801→                        <p className="text-[10px] text-zinc-500 uppercase tracking-wider font-medium mb-2">
+   802→                          {TOOL_CATEGORIES[category] ?? category}
+   803→                        </p>
+   804→                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+   805→                          {tools.map((tool) => {
+   806→                            const isChecked = agent.tools.includes(tool.id);
+   807→                            return (
+   808→                              <Tooltip key={tool.id}>
+   809→                                <TooltipTrigger asChild>
+   810→                                  <label className="flex items-center gap-2 rounded-md px-2 py-1.5 cursor-pointer hover:bg-zinc-800/40 transition-colors group/check">
+   811→                                    <Checkbox
+   812→                                      checked={isChecked}
+   813→                                      onCheckedChange={(checked) =>
+   814→                                        handleToolToggle(
+   815→                                          tool.id,
+   816→                                          checked === true,
+   817→                                        )
+   818→                                      }
+   819→                                      className={
+   820→                                        'data-[state=checked]:bg-violet-600 data-[state=checked]:border-violet-600'
+   821→                                      }
+   822→                                    />
+   823→                                    <span
+   824→                                      className={
+   825→                                        'text-xs truncate ' +
+   826→                                        (isChecked
+   827→                                          ? 'text-zinc-200'
+   828→                                          : 'text-zinc-500 group-hover/check:text-zinc-400')
+   829→                                      }
+   830→                                    >
+   831→                                      {tool.name}
+   832→                                    </span>
+   833→                                  </label>
+   834→                                </TooltipTrigger>
+   835→                                <TooltipContent
+   836→                                  side="bottom"
+   837→                                  className="max-w-[260px] bg-zinc-800 border-zinc-700 text-zinc-300 text-xs"
+   838→                                >
+   839→                                  <p className="font-medium mb-1">
+   840→                                    {tool.name}
+   841→                                  </p>
+   842→                                  <p className="text-zinc-400 leading-relaxed">
+   843→                                    {tool.description}
+   844→                                  </p>
+   845→                                </TooltipContent>
+   846→                              </Tooltip>
+   847→                            );
+   848→                          })}
+   849→                        </div>
+   850→                      </div>
+   851→                    ),
+   852→                  )}
+   853→                </div>
+   854→              </CollapsibleContent>
+   855→            </Collapsible>
+   856→          </div>
+   857→        </CollapsibleContent>
+   858→      </Card>
+   859→    </Collapsible>
+   860→  );
+   861→}
+   862→
+   863→// =============================================================================
+   864→// Skeleton Card
+   865→// =============================================================================
+   866→
+   867→function AgentCardSkeleton() {
+   868→  return (
+   869→    <Card className="border-l-4 border-l-violet-500/30 border border-zinc-800/60 rounded-xl">
+   870→      <div className="p-4 space-y-3">
+   871→        <div className="flex items-center gap-3">
+   872→          <Skeleton className="h-10 w-10 rounded-xl bg-zinc-800" />
+   873→          <div className="flex-1 space-y-2">
+   874→            <Skeleton className="h-4 w-24 bg-zinc-800" />
+   875→            <Skeleton className="h-3 w-48 bg-zinc-800" />
+   876→          </div>
+   877→          <Skeleton className="h-5 w-9 rounded-full bg-zinc-800" />
+   878→        </div>
+   879→        <Skeleton className="h-9 w-full bg-zinc-800" />
+   880→        <Skeleton className="h-9 w-full bg-zinc-800" />
+   881→      </div>
+   882→    </Card>
+   883→  );
+   884→}
+   885→
+   886→// =============================================================================
+   887→// Main AgentRoster Component
+   888→// =============================================================================
+   889→
+   890→export function AgentRoster() {
+   891→  const { agents, loading, fetchAgents, updateAgent, resetAgentsToDefaults } =
+   892→    useAgentStore();
+   893→  const { providers } = useProviderStore();
+   894→  const { setActiveView } = useUiStore();
+   895→
+   896→  const handleResetAll = useCallback(async () => {
+   897→    try {
+   898→      await resetAgentsToDefaults();
+   899→      toast.success('All agents reset to defaults');
+   900→    } catch {
+   901→      toast.error('Failed to reset agents');
+   902→    }
+   903→  }, [resetAgentsToDefaults]);
+   904→
+   905→  const handleNavigateToProviders = useCallback(() => {
+   906→    setActiveView('providers');
+   907→  }, [setActiveView]);
+   908→
+   909→  // Fetch agents on mount
+   910→  useEffect(() => {
+   911→    fetchAgents();
+   912→  }, [fetchAgents]);
+   913→
+   914→  // Sort agents by canonical order
+   915→  const sortedAgents = useMemo(() => {
+   916→    return [...agents].sort(
+   917→      (a, b) =>
+   918→        AGENT_ORDER.indexOf(a.agentId) - AGENT_ORDER.indexOf(b.agentId),
+   919→    );
+   920→  }, [agents]);
+   921→
+   922→  return (
+   923→    <div className="h-full overflow-y-auto">
+   924→      <ScrollArea className="h-full">
+   925→        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+   926→          {/* ── Header ── */}
+   927→          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+   928→            <div className="flex items-start gap-3">
+   929→              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-500/10 border border-violet-500/20">
+   930→                <Users className="h-5 w-5 text-violet-400" />
+   931→              </div>
+   932→              <div>
+   933→                <h1 className="text-lg font-semibold text-zinc-100">
+   934→                  Agent Council
+   935→                </h1>
+   936→                <p className="mt-0.5 text-sm text-zinc-500">
+   937→                  Configure specialized agents and their model assignments
+   938→                </p>
+   939→              </div>
+   940→            </div>
+   941→            <Button
+   942→              variant="outline"
+   943→              size="sm"
+   944→              className="self-start sm:self-auto h-8 px-3 text-xs border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 gap-1.5"
+   945→              onClick={handleResetAll}
+   946→              disabled={loading}
+   947→            >
+   948→              <RotateCcw className="h-3.5 w-3.5" />
+   949→              Reset to Defaults
+   950→            </Button>
+   951→          </div>
+   952→
+   953→          {/* ── Agent Grid ── */}
+   954→          {loading && agents.length === 0 ? (
+   955→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   956→              {Array.from({ length: 5 }).map((_, i) => (
+   957→                <AgentCardSkeleton key={i} />
+   958→              ))}
+   959→            </div>
+   960→          ) : sortedAgents.length === 0 ? (
+   961→            <div className="flex flex-col items-center justify-center py-16 gap-3">
+   962→              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-zinc-900 border border-zinc-800">
+   963→                <Users className="h-7 w-7 text-zinc-600" />
+   964→              </div>
+   965→              <p className="text-sm text-zinc-500">
+   966→                No agent configurations found. Initialize agents to get started.
+   967→              </p>
+   968→            </div>
+   969→          ) : (
+   970→            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+   971→              {sortedAgents.map((agent) => (
+   972→                <AgentCard
+   973→                  key={agent.agentId}
+   974→                  agent={agent}
+   975→                  providers={providers}
+   976→                  onUpdate={updateAgent}
+   977→                  onNavigateToProviders={handleNavigateToProviders}
+   978→                />
+   979→              ))}
+   980→            </div>
+   981→          )}
+   982→
+   983→          {/* Bottom padding for scroll */}
+   984→          <div className="h-8" />
+   985→        </div>
+   986→      </ScrollArea>
+   987→    </div>
+   988→  );
+   989→}
+   990→

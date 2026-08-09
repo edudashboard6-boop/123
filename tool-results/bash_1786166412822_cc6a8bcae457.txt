@@ -1,0 +1,527 @@
+0006200               {   /   *       N   a   v   i   g   a   t   i   o
+0006220   n       *   /  \n                           {   /   *       -
+0006240   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0006340   -       *   /   }  \n                           <   n   a   v
+0006360       c   l   a   s   s   N   a   m   e   =   "   f   l   e   x
+0006400       f   l   e   x   -   c   o   l       g   a   p   -   1    
+0006420   p   x   -   3       p   t   -   3       p   b   -   2   "   >
+0006440  \n                                   {   N   A   V   _   I   T
+0006460   E   M   S   .   m   a   p   (   (   i   t   e   m   )       =
+0006500   >       {  \n                                           c   o
+0006520   n   s   t       i   s   A   c   t   i   v   e       =       a
+0006540   c   t   i   v   e   V   i   e   w       =   =   =       i   t
+0006560   e   m   .   v   i   e   w   ;  \n                            
+0006600               c   o   n   s   t       I   c   o   n       =    
+0006620   i   t   e   m   .   i   c   o   n   ;  \n  \n                
+0006640                           r   e   t   u   r   n       (  \n    
+0006660                                               <   T   o   o   l
+0006700   t   i   p       k   e   y   =   {   i   t   e   m   .   v   i
+0006720   e   w   }   >  \n                                            
+0006740               <   T   o   o   l   t   i   p   T   r   i   g   g
+0006760   e   r       a   s   C   h   i   l   d   >  \n                
+0007000                                                   <   m   o   t
+0007020   i   o   n   .   b   u   t   t   o   n  \n                    
+0007040                                                       w   h   i
+0007060   l   e   H   o   v   e   r   =   {   {       x   :       2    
+0007100   }   }  \n                                                    
+0007120                       t   r   a   n   s   i   t   i   o   n   =
+0007140   {   {       t   y   p   e   :       '   s   p   r   i   n   g
+0007160   '   ,       s   t   i   f   f   n   e   s   s   :       4   0
+0007200   0   ,       d   a   m   p   i   n   g   :       2   5       }
+0007220   }  \n                                                        
+0007240                   o   n   C   l   i   c   k   =   {   (   )    
+0007260   =   >       s   e   t   A   c   t   i   v   e   V   i   e   w
+0007300   (   i   t   e   m   .   v   i   e   w   )   }  \n            
+0007320                                                               c
+0007340   l   a   s   s   N   a   m   e   =   {   c   n   (  \n        
+0007360                                                                
+0007400           '   r   e   l   a   t   i   v   e       f   l   e   x
+0007420       w   -   f   u   l   l       i   t   e   m   s   -   c   e
+0007440   n   t   e   r       g   a   p   -   3       r   o   u   n   d
+0007460   e   d   -   l   g       p   x   -   3       p   y   -   2   .
+0007500   5       t   e   x   t   -   s   m       f   o   n   t   -   m
+0007520   e   d   i   u   m       t   r   a   n   s   i   t   i   o   n
+0007540   -   c   o   l   o   r   s   '   ,  \n                        
+0007560                                                           '   f
+0007600   o   c   u   s   -   v   i   s   i   b   l   e   :   o   u   t
+0007620   l   i   n   e   -   n   o   n   e       f   o   c   u   s   -
+0007640   v   i   s   i   b   l   e   :   r   i   n   g   -   2       f
+0007660   o   c   u   s   -   v   i   s   i   b   l   e   :   r   i   n
+0007700   g   -   v   i   o   l   e   t   -   5   0   0   /   5   0   '
+0007720   ,  \n                                                        
+0007740                           i   s   A   c   t   i   v   e  \n    
+0007760                                                                
+0010000                       ?       '   b   g   -   v   i   o   l   e
+0010020   t   -   6   0   0   /   1   5       t   e   x   t   -   v   i
+0010040   o   l   e   t   -   3   0   0   '  \n                        
+0010060                                                                
+0010100   :       '   t   e   x   t   -   z   i   n   c   -   4   0   0
+0010120       h   o   v   e   r   :   b   g   -   z   i   n   c   -   8
+0010140   0   0   /   7   0       h   o   v   e   r   :   t   e   x   t
+0010160   -   z   i   n   c   -   2   0   0   '   ,  \n                
+0010200                                                           )   }
+0010220  \n                                                            
+0010240       >  \n                                                    
+0010260                       {   i   s   A   c   t   i   v   e       &
+0010300   &       (  \n                                                
+0010320                                   <   m   o   t   i   o   n   .
+0010340   d   i   v  \n                                                
+0010360                                           l   a   y   o   u   t
+0010400   I   d   =   "   n   e   x   u   s   -   a   c   t   i   v   e
+0010420   -   n   a   v   "  \n                                        
+0010440                                                   c   l   a   s
+0010460   s   N   a   m   e   =   "   a   b   s   o   l   u   t   e    
+0010500   i   n   s   e   t   -   0       r   o   u   n   d   e   d   -
+0010520   l   g       b   g   -   v   i   o   l   e   t   -   6   0   0
+0010540   /   1   5   "  \n                                            
+0010560                                               t   r   a   n   s
+0010600   i   t   i   o   n   =   {   {  \n                            
+0010620                                                                
+0010640       t   y   p   e   :       '   s   p   r   i   n   g   '   ,
+0010660  \n                                                            
+0010700                                       s   t   i   f   f   n   e
+0010720   s   s   :       3   5   0   ,  \n                            
+0010740                                                                
+0010760       d   a   m   p   i   n   g   :       3   0   ,  \n        
+0011000                                                                
+0011020                   }   }  \n                                    
+0011040                                               /   >  \n        
+0011060                                                                
+0011100   )   }  \n                                                    
+0011120                       <   I   c   o   n       c   l   a   s   s
+0011140   N   a   m   e   =   {   c   n   (   '   r   e   l   a   t   i
+0011160   v   e       z   -   1   0       h   -   4       w   -   4   '
+0011200   ,       i   s   A   c   t   i   v   e       ?       '   t   e
+0011220   x   t   -   v   i   o   l   e   t   -   4   0   0   '       :
+0011240       '   '   )   }       /   >  \n                            
+0011260                                               <   s   p   a   n
+0011300       c   l   a   s   s   N   a   m   e   =   "   r   e   l   a
+0011320   t   i   v   e       z   -   1   0   "   >   {   i   t   e   m
+0011340   .   l   a   b   e   l   }   <   /   s   p   a   n   >  \n    
+0011360                                                               <
+0011400   /   m   o   t   i   o   n   .   b   u   t   t   o   n   >  \n
+0011420                                                           <   /
+0011440   T   o   o   l   t   i   p   T   r   i   g   g   e   r   >  \n
+0011460                                                           <   T
+0011500   o   o   l   t   i   p   C   o   n   t   e   n   t       s   i
+0011520   d   e   =   "   r   i   g   h   t   "       s   i   d   e   O
+0011540   f   f   s   e   t   =   {   8   }   >  \n                    
+0011560                                               <   p       c   l
+0011600   a   s   s   N   a   m   e   =   "   t   e   x   t   -   z   i
+0011620   n   c   -   2   0   0       b   g   -   z   i   n   c   -   8
+0011640   0   0       b   o   r   d   e   r       b   o   r   d   e   r
+0011660   -   z   i   n   c   -   7   0   0   "   >   {   i   t   e   m
+0011700   .   l   a   b   e   l   }   <   /   p   >  \n                
+0011720                                           <   /   T   o   o   l
+0011740   t   i   p   C   o   n   t   e   n   t   >  \n                
+0011760                                   <   /   T   o   o   l   t   i
+0012000   p   >  \n                                           )   ;  \n
+0012020                                   }   )   }  \n                
+0012040           <   /   n   a   v   >  \n  \n                        
+0012060   <   S   e   p   a   r   a   t   o   r       c   l   a   s   s
+0012100   N   a   m   e   =   "   b   g   -   z   i   n   c   -   8   0
+0012120   0   "       /   >  \n  \n                           {   /   *
+0012140       -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0012160   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0012240   -   -   -       *   /   }  \n                           {   /
+0012260   *       S   e   s   s   i   o   n   s       *   /  \n        
+0012300                   {   /   *       -   -   -   -   -   -   -   -
+0012320   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0012400   -   -   -   -   -   -   -   -   -   -       *   /   }  \n    
+0012420                       <   d   i   v       c   l   a   s   s   N
+0012440   a   m   e   =   "   f   l   e   x       f   l   e   x   -   c
+0012460   o   l       f   l   e   x   -   1       m   i   n   -   h   -
+0012500   0   "   >  \n                                   <   d   i   v
+0012520       c   l   a   s   s   N   a   m   e   =   "   f   l   e   x
+0012540       i   t   e   m   s   -   c   e   n   t   e   r       j   u
+0012560   s   t   i   f   y   -   b   e   t   w   e   e   n       p   x
+0012600   -   4       p   t   -   3       p   b   -   2   "   >  \n    
+0012620                                       <   s   p   a   n       c
+0012640   l   a   s   s   N   a   m   e   =   "   t   e   x   t   -   x
+0012660   s       f   o   n   t   -   s   e   m   i   b   o   l   d    
+0012700   u   p   p   e   r   c   a   s   e       t   r   a   c   k   i
+0012720   n   g   -   w   i   d   e   r       t   e   x   t   -   z   i
+0012740   n   c   -   5   0   0   "   >  \n                            
+0012760                       S   e   s   s   i   o   n   s  \n        
+0013000                                   <   /   s   p   a   n   >  \n
+0013020                                           <   B   u   t   t   o
+0013040   n  \n                                                   v   a
+0013060   r   i   a   n   t   =   "   g   h   o   s   t   "  \n        
+0013100                                           s   i   z   e   =   "
+0013120   i   c   o   n   "  \n                                        
+0013140           c   l   a   s   s   N   a   m   e   =   "   h   -   7
+0013160       w   -   7       t   e   x   t   -   z   i   n   c   -   5
+0013200   0   0       h   o   v   e   r   :   t   e   x   t   -   v   i
+0013220   o   l   e   t   -   4   0   0       h   o   v   e   r   :   b
+0013240   g   -   z   i   n   c   -   8   0   0   "  \n                
+0013260                                   o   n   C   l   i   c   k   =
+0013300   {   h   a   n   d   l   e   N   e   w   C   h   a   t   }  \n
+0013320                                           >  \n                
+0013340                                   <   P   l   u   s       c   l
+0013360   a   s   s   N   a   m   e   =   "   h   -   4       w   -   4
+0013400   "       /   >  \n                                            
+0013420       <   s   p   a   n       c   l   a   s   s   N   a   m   e
+0013440   =   "   s   r   -   o   n   l   y   "   >   N   e   w       C
+0013460   h   a   t   <   /   s   p   a   n   >  \n                    
+0013500                       <   /   B   u   t   t   o   n   >  \n    
+0013520                               <   /   d   i   v   >  \n  \n    
+0013540                               <   S   c   r   o   l   l   A   r
+0013560   e   a       c   l   a   s   s   N   a   m   e   =   "   f   l
+0013600   e   x   -   1       p   x   -   2   "   >  \n                
+0013620                           <   d   i   v       c   l   a   s   s
+0013640   N   a   m   e   =   "   f   l   e   x       f   l   e   x   -
+0013660   c   o   l       g   a   p   -   0   .   5       p   b   -   4
+0013700   "   >  \n                                                   {
+0013720   r   e   c   e   n   t   S   e   s   s   i   o   n   s   .   l
+0013740   e   n   g   t   h       =   =   =       0       &   &       (
+0013760  \n                                                           <
+0014000   p       c   l   a   s   s   N   a   m   e   =   "   p   x   -
+0014020   3       p   y   -   4       t   e   x   t   -   x   s       t
+0014040   e   x   t   -   z   i   n   c   -   6   0   0       t   e   x
+0014060   t   -   c   e   n   t   e   r   "   >  \n                    
+0014100                                               N   o       s   e
+0014120   s   s   i   o   n   s       y   e   t  \n                    
+0014140                                       <   /   p   >  \n        
+0014160                                           )   }  \n            
+0014200                                       {   r   e   c   e   n   t
+0014220   S   e   s   s   i   o   n   s   .   m   a   p   (   (   s   e
+0014240   s   s   i   o   n   )       =   >       {  \n                
+0014260                                           c   o   n   s   t    
+0014300   i   s   A   c   t   i   v   e       =       a   c   t   i   v
+0014320   e   S   e   s   s   i   o   n   I   d       =   =   =       s
+0014340   e   s   s   i   o   n   .   i   d   ;  \n                    
+0014360                                       r   e   t   u   r   n    
+0014400   (  \n                                                        
+0014420           <   d   i   v  \n                                    
+0014440                                       k   e   y   =   {   s   e
+0014460   s   s   i   o   n   .   i   d   }  \n                        
+0014500                                                   o   n   C   l
+0014520   i   c   k   =   {   (   )       =   >       h   a   n   d   l
+0014540   e   S   e   l   e   c   t   S   e   s   s   i   o   n   (   s
+0014560   e   s   s   i   o   n   .   i   d   )   }  \n                
+0014600                                                           c   l
+0014620   a   s   s   N   a   m   e   =   {   c   n   (  \n            
+0014640                                                                
+0014660       '   g   r   o   u   p       r   e   l   a   t   i   v   e
+0014700       f   l   e   x       w   -   f   u   l   l       i   t   e
+0014720   m   s   -   c   e   n   t   e   r       g   a   p   -   2    
+0014740   r   o   u   n   d   e   d   -   l   g       p   x   -   3    
+0014760   p   y   -   2       t   e   x   t   -   l   e   f   t       t
+0015000   e   x   t   -   s   m       t   r   a   n   s   i   t   i   o
+0015020   n   -   c   o   l   o   r   s       c   u   r   s   o   r   -
+0015040   p   o   i   n   t   e   r   '   ,  \n                        
+0015060                                                           '   f
+0015100   o   c   u   s   -   v   i   s   i   b   l   e   :   o   u   t
+0015120   l   i   n   e   -   n   o   n   e       f   o   c   u   s   -
+0015140   v   i   s   i   b   l   e   :   r   i   n   g   -   2       f
+0015160   o   c   u   s   -   v   i   s   i   b   l   e   :   r   i   n
+0015200   g   -   v   i   o   l   e   t   -   5   0   0   /   5   0   '
+0015220   ,  \n                                                        
+0015240                           i   s   A   c   t   i   v   e  \n    
+0015260                                                                
+0015300                       ?       '   b   g   -   z   i   n   c   -
+0015320   8   0   0       t   e   x   t   -   z   i   n   c   -   1   0
+0015340   0   '  \n                                                    
+0015360                                       :       '   t   e   x   t
+0015400   -   z   i   n   c   -   5   0   0       h   o   v   e   r   :
+0015420   b   g   -   z   i   n   c   -   8   0   0   /   5   0       h
+0015440   o   v   e   r   :   t   e   x   t   -   z   i   n   c   -   3
+0015460   0   0   '   ,  \n                                            
+0015500                               )   }  \n                        
+0015520                                           >  \n                
+0015540                                                           <   M
+0015560   e   s   s   a   g   e   S   q   u   a   r   e       c   l   a
+0015600   s   s   N   a   m   e   =   "   h   -   3   .   5       w   -
+0015620   3   .   5       s   h   r   i   n   k   -   0       o   p   a
+0015640   c   i   t   y   -   6   0   "       /   >  \n                
+0015660                                                           <   s
+0015700   p   a   n       c   l   a   s   s   N   a   m   e   =   "   f
+0015720   l   e   x   -   1       t   r   u   n   c   a   t   e       t
+0015740   e   x   t   -   x   s   "   >   {   s   e   s   s   i   o   n
+0015760   .   t   i   t   l   e   }   <   /   s   p   a   n   >  \n    
+0016000                                                                
+0016020       <   D   r   o   p   d   o   w   n   M   e   n   u   >  \n
+0016040                                                                
+0016060                   <   D   r   o   p   d   o   w   n   M   e   n
+0016100   u   T   r   i   g   g   e   r       a   s   C   h   i   l   d
+0016120   >  \n                                                        
+0016140                                   <   b   u   t   t   o   n  \n
+0016160                                                                
+0016200                                   t   y   p   e   =   "   b   u
+0016220   t   t   o   n   "  \n                                        
+0016240                                                           c   l
+0016260   a   s   s   N   a   m   e   =   {   c   n   (  \n            
+0016300                                                                
+0016320                               '   i   n   l   i   n   e   -   f
+0016340   l   e   x       i   t   e   m   s   -   c   e   n   t   e   r
+0016360       j   u   s   t   i   f   y   -   c   e   n   t   e   r    
+0016400   h   -   6       w   -   6       s   h   r   i   n   k   -   0
+0016420       o   p   a   c   i   t   y   -   0       g   r   o   u   p
+0016440   -   h   o   v   e   r   :   o   p   a   c   i   t   y   -   1
+0016460   0   0       t   r   a   n   s   i   t   i   o   n   -   o   p
+0016500   a   c   i   t   y       r   o   u   n   d   e   d   -   m   d
+0016520   '   ,  \n                                                    
+0016540                                                       '   t   e
+0016560   x   t   -   z   i   n   c   -   5   0   0       h   o   v   e
+0016600   r   :   t   e   x   t   -   r   e   d   -   4   0   0       h
+0016620   o   v   e   r   :   b   g   -   z   i   n   c   -   7   0   0
+0016640   '   ,  \n                                                    
+0016660                                               )   }  \n        
+0016700                                                                
+0016720                           o   n   C   l   i   c   k   =   {   (
+0016740   e   )       =   >       e   .   s   t   o   p   P   r   o   p
+0016760   a   g   a   t   i   o   n   (   )   }  \n                    
+0017000                                                                
+0017020       >  \n                                                    
+0017040                                               <   M   o   r   e
+0017060   V   e   r   t   i   c   a   l       c   l   a   s   s   N   a
+0017100   m   e   =   "   h   -   3       w   -   3   "       /   >  \n
+0017120                                                                
+0017140                                   <   s   p   a   n       c   l
+0017160   a   s   s   N   a   m   e   =   "   s   r   -   o   n   l   y
+0017200   "   >   S   e   s   s   i   o   n       a   c   t   i   o   n
+0017220   s   <   /   s   p   a   n   >  \n                            
+0017240                                                               <
+0017260   /   b   u   t   t   o   n   >  \n                            
+0017300                                                       <   /   D
+0017320   r   o   p   d   o   w   n   M   e   n   u   T   r   i   g   g
+0017340   e   r   >  \n                                                
+0017360                                   <   D   r   o   p   d   o   w
+0017400   n   M   e   n   u   C   o   n   t   e   n   t  \n            
+0017420                                                                
+0017440               a   l   i   g   n   =   "   e   n   d   "  \n    
+0017460                                                                
+0017500                       c   l   a   s   s   N   a   m   e   =   "
+0017520   w   -   3   6       b   g   -   z   i   n   c   -   8   0   0
+0017540       b   o   r   d   e   r   -   z   i   n   c   -   7   0   0
+0017560   "  \n                                                        
+0017600                           >  \n                                
+0017620                                                           <   D
+0017640   r   o   p   d   o   w   n   M   e   n   u   I   t   e   m  \n
+0017660                                                                
+0017700                                   c   l   a   s   s   N   a   m
+0017720   e   =   "   t   e   x   t   -   z   i   n   c   -   4   0   0
+0017740       f   o   c   u   s   :   t   e   x   t   -   r   e   d   -
+0017760   4   0   0       f   o   c   u   s   :   b   g   -   z   i   n
+0020000   c   -   7   0   0   "  \n                                    
+0020020                                                               o
+0020040   n   C   l   i   c   k   =   {   (   e   )       =   >       h
+0020060   a   n   d   l   e   D   e   l   e   t   e   S   e   s   s   i
+0020100   o   n   (   s   e   s   s   i   o   n   .   i   d   ,       e
+0020120   )   }  \n                                                    
+0020140                                       >  \n                    
+0020160                                                                
+0020200               <   T   r   a   s   h   2       c   l   a   s   s
+0020220   N   a   m   e   =   "   m   r   -   2       h   -   3   .   5
+0020240       w   -   3   .   5   "       /   >  \n                    
+0020260                                                                
+0020300               D   e   l   e   t   e  \n                        
+0020320                                                                
+0020340   <   /   D   r   o   p   d   o   w   n   M   e   n   u   I   t
+0020360   e   m   >  \n                                                
+0020400                                   <   /   D   r   o   p   d   o
+0020420   w   n   M   e   n   u   C   o   n   t   e   n   t   >  \n    
+0020440                                                                
+0020460       <   /   D   r   o   p   d   o   w   n   M   e   n   u   >
+0020500  \n                                                            
+0020520       <   /   d   i   v   >  \n                                
+0020540                           )   ;  \n                            
+0020560                       }   )   }  \n                            
+0020600               <   /   d   i   v   >  \n                        
+0020620           <   /   S   c   r   o   l   l   A   r   e   a   >  \n
+0020640                           <   /   d   i   v   >  \n  \n        
+0020660                   {   /   *       -   -   -   -   -   -   -   -
+0020700   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0020760   -   -   -   -   -   -   -   -   -   -       *   /   }  \n    
+0021000                       {   /   *       F   o   o   t   e   r    
+0021020   b   a   d   g   e       *   /  \n                           {
+0021040   /   *       -   -   -   -   -   -   -   -   -   -   -   -   -
+0021060   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0021140   -   -   -   -   -       *   /   }  \n                        
+0021160   <   S   e   p   a   r   a   t   o   r       c   l   a   s   s
+0021200   N   a   m   e   =   "   b   g   -   z   i   n   c   -   8   0
+0021220   0   "       /   >  \n                           <   d   i   v
+0021240       c   l   a   s   s   N   a   m   e   =   "   f   l   e   x
+0021260       i   t   e   m   s   -   c   e   n   t   e   r       g   a
+0021300   p   -   2       p   x   -   4       p   y   -   3   "   >  \n
+0021320                                   <   d   i   v       c   l   a
+0021340   s   s   N   a   m   e   =   "   h   -   2       w   -   2    
+0021360   r   o   u   n   d   e   d   -   f   u   l   l       b   g   -
+0021400   e   m   e   r   a   l   d   -   5   0   0       a   n   i   m
+0021420   a   t   e   -   p   u   l   s   e   "       /   >  \n        
+0021440                           <   s   p   a   n       c   l   a   s
+0021460   s   N   a   m   e   =   "   t   e   x   t   -   [   1   1   p
+0021500   x   ]       t   e   x   t   -   z   i   n   c   -   5   0   0
+0021520       f   o   n   t   -   m   e   d   i   u   m   "   >   S   y
+0021540   s   t   e   m       O   n   l   i   n   e   <   /   s   p   a
+0021560   n   >  \n                           <   /   d   i   v   >  \n
+0021600                   <   /   d   i   v   >  \n           )   ;  \n
+0021620   }  \n  \n   /   /       -   -   -   -   -   -   -   -   -   -
+0021640   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0021740   -   -   -  \n   /   /       N   a   v   I   c   o   n   O   n
+0021760   l   y     342 200 224       i   c   o   n   s       s   h   o
+0022000   w   n       w   h   e   n       s   i   d   e   b   a   r    
+0022020   i   s       c   o   l   l   a   p   s   e   d  \n   /   /    
+0022040   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0022140   -   -   -   -   -   -   -   -   -   -   -   -   -  \n  \n   f
+0022160   u   n   c   t   i   o   n       N   a   v   I   c   o   n   O
+0022200   n   l   y   (   )       {  \n           c   o   n   s   t    
+0022220   {       a   c   t   i   v   e   V   i   e   w   ,       s   e
+0022240   t   A   c   t   i   v   e   V   i   e   w       }       =    
+0022260   u   s   e   U   i   S   t   o   r   e   (   )   ;  \n  \n    
+0022300       r   e   t   u   r   n       (  \n                   <   d
+0022320   i   v       c   l   a   s   s   N   a   m   e   =   "   f   l
+0022340   e   x       h   -   f   u   l   l       f   l   e   x   -   c
+0022360   o   l       i   t   e   m   s   -   c   e   n   t   e   r    
+0022400   b   g   -   z   i   n   c   -   9   0   0       p   y   -   3
+0022420   "   >  \n                           {   /   *       B   r   a
+0022440   n   d       i   c   o   n       *   /   }  \n                
+0022460           <   d   i   v       c   l   a   s   s   N   a   m   e
+0022500   =   "   f   l   e   x       h   -   9       w   -   9       i
+0022520   t   e   m   s   -   c   e   n   t   e   r       j   u   s   t
+0022540   i   f   y   -   c   e   n   t   e   r       r   o   u   n   d
+0022560   e   d   -   l   g       b   g   -   v   i   o   l   e   t   -
+0022600   6   0   0   /   2   0       m   b   -   4   "   >  \n        
+0022620                           <   H   e   x   a   g   o   n       c
+0022640   l   a   s   s   N   a   m   e   =   "   h   -   5       w   -
+0022660   5       t   e   x   t   -   v   i   o   l   e   t   -   4   0
+0022700   0   "       s   t   r   o   k   e   W   i   d   t   h   =   {
+0022720   2   .   5   }       /   >  \n                           <   /
+0022740   d   i   v   >  \n  \n                           <   S   e   p
+0022760   a   r   a   t   o   r       c   l   a   s   s   N   a   m   e
+0023000   =   "   w   -   8       b   g   -   z   i   n   c   -   8   0
+0023020   0       m   b   -   2   "       /   >  \n  \n                
+0023040           {   /   *       N   a   v       i   c   o   n   s    
+0023060   *   /   }  \n                           <   n   a   v       c
+0023100   l   a   s   s   N   a   m   e   =   "   f   l   e   x       f
+0023120   l   e   x   -   c   o   l       i   t   e   m   s   -   c   e
+0023140   n   t   e   r       g   a   p   -   1   "   >  \n            
+0023160                       {   N   A   V   _   I   T   E   M   S   .
+0023200   m   a   p   (   (   i   t   e   m   )       =   >       {  \n
+0023220                                           c   o   n   s   t    
+0023240   i   s   A   c   t   i   v   e       =       a   c   t   i   v
+0023260   e   V   i   e   w       =   =   =       i   t   e   m   .   v
+0023300   i   e   w   ;  \n                                           c
+0023320   o   n   s   t       I   c   o   n       =       i   t   e   m
+0023340   .   i   c   o   n   ;  \n                                    
+0023360       r   e   t   u   r   n       (  \n                        
+0023400                           <   T   o   o   l   t   i   p       k
+0023420   e   y   =   {   i   t   e   m   .   v   i   e   w   }   >  \n
+0023440                                                           <   T
+0023460   o   o   l   t   i   p   T   r   i   g   g   e   r       a   s
+0023500   C   h   i   l   d   >  \n                                    
+0023520                               <   b   u   t   t   o   n  \n    
+0023540                                                                
+0023560       o   n   C   l   i   c   k   =   {   (   )       =   >    
+0023600   s   e   t   A   c   t   i   v   e   V   i   e   w   (   i   t
+0023620   e   m   .   v   i   e   w   )   }  \n                        
+0023640                                                   c   l   a   s
+0023660   s   N   a   m   e   =   {   c   n   (  \n                    
+0023700                                                               '
+0023720   f   l   e   x       h   -   1   0       w   -   1   0       i
+0023740   t   e   m   s   -   c   e   n   t   e   r       j   u   s   t
+0023760   i   f   y   -   c   e   n   t   e   r       r   o   u   n   d
+0024000   e   d   -   l   g       t   r   a   n   s   i   t   i   o   n
+0024020   -   c   o   l   o   r   s   '   ,  \n                        
+0024040                                                           '   f
+0024060   o   c   u   s   -   v   i   s   i   b   l   e   :   o   u   t
+0024100   l   i   n   e   -   n   o   n   e       f   o   c   u   s   -
+0024120   v   i   s   i   b   l   e   :   r   i   n   g   -   2       f
+0024140   o   c   u   s   -   v   i   s   i   b   l   e   :   r   i   n
+0024160   g   -   v   i   o   l   e   t   -   5   0   0   /   5   0   '
+0024200   ,  \n                                                        
+0024220                           i   s   A   c   t   i   v   e  \n    
+0024240                                                                
+0024260                       ?       '   b   g   -   v   i   o   l   e
+0024300   t   -   6   0   0   /   1   5       t   e   x   t   -   v   i
+0024320   o   l   e   t   -   4   0   0   '  \n                        
+0024340                                                                
+0024360   :       '   t   e   x   t   -   z   i   n   c   -   5   0   0
+0024400       h   o   v   e   r   :   b   g   -   z   i   n   c   -   8
+0024420   0   0   /   7   0       h   o   v   e   r   :   t   e   x   t
+0024440   -   z   i   n   c   -   3   0   0   '   ,  \n                
+0024460                                                           )   }
+0024500  \n                                                            
+0024520       >  \n                                                    
+0024540                       <   I   c   o   n       c   l   a   s   s
+0024560   N   a   m   e   =   "   h   -   4       w   -   4   "       /
+0024600   >  \n                                                        
+0024620           <   /   b   u   t   t   o   n   >  \n                
+0024640                                           <   /   T   o   o   l
+0024660   t   i   p   T   r   i   g   g   e   r   >  \n                
+0024700                                           <   T   o   o   l   t
+0024720   i   p   C   o   n   t   e   n   t       s   i   d   e   =   "
+0024740   r   i   g   h   t   "       s   i   d   e   O   f   f   s   e
+0024760   t   =   {   8   }   >  \n                                    
+0025000                               <   p       c   l   a   s   s   N
+0025020   a   m   e   =   "   t   e   x   t   -   z   i   n   c   -   2
+0025040   0   0       b   g   -   z   i   n   c   -   8   0   0       b
+0025060   o   r   d   e   r       b   o   r   d   e   r   -   z   i   n
+0025100   c   -   7   0   0   "   >   {   i   t   e   m   .   l   a   b
+0025120   e   l   }   <   /   p   >  \n                                
+0025140                           <   /   T   o   o   l   t   i   p   C
+0025160   o   n   t   e   n   t   >  \n                                
+0025200                   <   /   T   o   o   l   t   i   p   >  \n    
+0025220                                       )   ;  \n                
+0025240                   }   )   }  \n                           <   /
+0025260   n   a   v   >  \n  \n                           {   /   *    
+0025300   S   p   a   c   e   r       +       o   n   l   i   n   e    
+0025320   i   n   d   i   c   a   t   o   r       *   /   }  \n        
+0025340                   <   d   i   v       c   l   a   s   s   N   a
+0025360   m   e   =   "   f   l   e   x   -   1   "       /   >  \n    
+0025400                       <   d   i   v       c   l   a   s   s   N
+0025420   a   m   e   =   "   f   l   e   x       i   t   e   m   s   -
+0025440   c   e   n   t   e   r       j   u   s   t   i   f   y   -   c
+0025460   e   n   t   e   r       p   y   -   3   "   >  \n            
+0025500                       <   d   i   v       c   l   a   s   s   N
+0025520   a   m   e   =   "   h   -   2       w   -   2       r   o   u
+0025540   n   d   e   d   -   f   u   l   l       b   g   -   e   m   e
+0025560   r   a   l   d   -   5   0   0       a   n   i   m   a   t   e
+0025600   -   p   u   l   s   e   "       /   >  \n                    
+0025620       <   /   d   i   v   >  \n                   <   /   d   i
+0025640   v   >  \n           )   ;  \n   }  \n  \n   /   /       -   -
+0025660   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0025760   -   -   -   -   -   -   -   -   -   -   -  \n   /   /       A
+0026000   p   p   S   i   d   e   b   a   r     342 200 224       d   e
+0026020   s   k   t   o   p       s   i   d   e   b   a   r       (   w
+0026040   -   6   4       e   x   p   a   n   d   e   d   ,       w   -
+0026060   1   6       c   o   l   l   a   p   s   e   d   )  \n   /   /
+0026100       -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+0026120   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -
+*
+0026200   -   -   -   -   -   -   -   -   -   -   -   -   -   -  \n  \n
+0026220   e   x   p   o   r   t       f   u   n   c   t   i   o   n    
+0026240   A   p   p   S   i   d   e   b   a   r   (   )       {  \n    
+0026260       c   o   n   s   t       {       s   i   d   e   b   a   r
+0026300   C   o   l   l   a   p   s   e   d       }       =       u   s
+0026320   e   U   i   S   t   o   r   e   (   )   ;  \n  \n           r
+0026340   e   t   u   r   n       (  \n                   <   m   o   t
+0026360   i   o   n   .   a   s   i   d   e  \n                        
+0026400   a   n   i   m   a   t   e   =   {   {       w   i   d   t   h
+0026420   :       s   i   d   e   b   a   r   C   o   l   l   a   p   s
+0026440   e   d       ?       6   4       :       2   5   6       }   }
+0026460  \n                           t   r   a   n   s   i   t   i   o
+0026500   n   =   {   {       t   y   p   e   :       '   s   p   r   i
+0026520   n   g   '   ,       s   t   i   f   f   n   e   s   s   :    
+0026540   3   0   0   ,       d   a   m   p   i   n   g   :       3   0
+0026560       }   }  \n                           c   l   a   s   s   N
+0026600   a   m   e   =   "   h   i   d   d   e   n       m   d   :   f
+0026620   l   e   x       h   -   f   u   l   l       s   h   r   i   n
+0026640   k   -   0       b   o   r   d   e   r   -   r       b   o   r
+0026660   d   e   r   -   z   i   n   c   -   8   0   0   /   8   0   "
+0026700  \n                   >  \n                           {   s   i
+0026720   d   e   b   a   r   C   o   l   l   a   p   s   e   d       ?
+0026740       <   N   a   v   I   c   o   n   O   n   l   y       /   >
+0026760       :       <   S   i   d   e   b   a   r   C   o   n   t   e
+0027000   n   t       /   >   }  \n                   <   /   m   o   t
+0027020   i   o   n   .   a   s   i   d   e   >  \n           )   ;  \n
+0027040   }  \n
+0027042

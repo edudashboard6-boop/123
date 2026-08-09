@@ -1,0 +1,659 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import React, { useCallback, useEffect, useRef, useState } from 'react';
+     4→     4→import { useTheme } from 'next-themes';
+     5→     5→import { toast } from 'sonner';
+     6→     6→import {
+     7→     7→  Settings,
+     8→     8→  Moon,
+     9→     9→  Sun,
+    10→    10→  DollarSign,
+    11→    11→  AlertTriangle,
+    12→    12→  Info,
+    13→    13→  ExternalLink,
+    14→    14→  ChevronRight,
+    15→    15→  RotateCcw,
+    16→    16→  Save,
+    17→    17→  Check,
+    18→    18→  Shield,
+    19→    19→} from 'lucide-react';
+    20→    20→
+    21→    21→import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+    22→    22→import { Button } from '@/components/ui/button';
+    23→    23→import { Badge } from '@/components/ui/badge';
+    24→    24→import { Label } from '@/components/ui/label';
+    25→    25→import { Input } from '@/components/ui/input';
+    26→    26→import { Slider } from '@/components/ui/slider';
+    27→    27→import { Switch } from '@/components/ui/switch';
+    28→    28→import { Separator } from '@/components/ui/separator';
+    29→    29→import { ScrollArea } from '@/components/ui/scroll-area';
+    30→    30→import {
+    31→    31→  Select,
+    32→    32→  SelectContent,
+    33→    33→  SelectItem,
+    34→    34→  SelectTrigger,
+    35→    35→  SelectValue,
+    36→    36→} from '@/components/ui/select';
+    37→    37→import {
+    38→    38→  Tooltip,
+    39→    39→  TooltipContent,
+    40→    40→  TooltipProvider,
+    41→    41→  TooltipTrigger,
+    42→    42→} from '@/components/ui/tooltip';
+    43→    43→import type { DebateMode } from '@/lib/types';
+    44→    44→
+    45→    45→// -----------------------------------------------------------------------------
+    46→    46→// Types
+    47→    47→// -----------------------------------------------------------------------------
+    48→    48→
+    49→    49→interface AppSettings {
+    50→    50→  theme: 'dark' | 'light';
+    51→    51→  language: string;
+    52→    52→  defaultDebateMode: DebateMode;
+    53→    53→  autoSave: boolean;
+    54→    54→  sessionBudgetLimit: number;
+    55→    55→  agentBudgetLimits: Record<string, number>;
+    56→    56→  budgetAlertThreshold: number;
+    57→    57→  sandboxMode: boolean;
+    58→    58→  autoApproveTools: boolean;
+    59→    59→  auditLogging: boolean;
+    60→    60→  secretStorage: string;
+    61→    61→  contextWindowBudget: number;
+    62→    62→  maxDebateRounds: number;
+    63→    63→  fallbackOnError: boolean;
+    64→    64→  telemetry: boolean;
+    65→    65→}
+    66→    66→
+    67→    67→const DEFAULT_SETTINGS: AppSettings = {
+    68→    68→  theme: 'dark',
+    69→    69→  language: 'en',
+    70→    70→  defaultDebateMode: 'fast',
+    71→    71→  autoSave: true,
+    72→    72→  sessionBudgetLimit: 10,
+    73→    73→  agentBudgetLimits: {
+    74→    74→    architect: 5,
+    75→    75→    forge: 10,
+    76→    76→    sentinel: 5,
+    77→    77→    perception: 3,
+    78→    78→    scribe: 3,
+    79→    79→  },
+    80→    80→  budgetAlertThreshold: 75,
+    81→    81→  sandboxMode: true,
+    82→    82→  autoApproveTools: false,
+    83→    83→  auditLogging: true,
+    84→    84→  secretStorage: 'OS Keychain',
+    85→    85→  contextWindowBudget: 80,
+    86→    86→  maxDebateRounds: 3,
+    87→    87→  fallbackOnError: true,
+    88→    88→  telemetry: false,
+    89→    89→};
+    90→    90→
+    91→    91→const AGENT_LABELS: Record<string, { name: string; color: string }> = {
+    92→    92→  architect: { name: 'Architect', color: 'text-violet-400' },
+    93→    93→  forge: { name: 'Forge', color: 'text-blue-400' },
+    94→    94→  sentinel: { name: 'Sentinel', color: 'text-red-400' },
+    95→    95→  perception: { name: 'Perception', color: 'text-amber-400' },
+    96→    96→  scribe: { name: 'Scribe', color: 'text-green-400' },
+    97→    97→};
+    98→    98→
+    99→    99→const BUDGET_THRESHOLDS = [50, 75, 90, 100];
+   100→   100→
+   101→   101→// -----------------------------------------------------------------------------
+   102→   102→// Component
+   103→   103→// -----------------------------------------------------------------------------
+   104→   104→
+   105→   105→export function SettingsPanel() {
+   106→   106→  const { setTheme } = useTheme();
+   107→   107→  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+   108→   108→  const [loading, setLoading] = useState(true);
+   109→   109→  const [saving, setSaving] = useState(false);
+   110→   110→  const [saveFlash, setSaveFlash] = useState<string | null>(null);
+   111→   111→  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+   112→   112→
+   113→   113→  // ---------------------------------------------------------------------------
+   114→   114→  // Fetch settings
+   115→   115→  // ---------------------------------------------------------------------------
+   116→   116→
+   117→   117→  const fetchSettings = useCallback(async () => {
+   118→   118→    setLoading(true);
+   119→   119→    try {
+   120→   120→      const res = await fetch('/api/settings');
+   121→   121→      if (res.ok) {
+   122→   122→        const data = await res.json();
+   123→   123→        setSettings({ ...DEFAULT_SETTINGS, ...data });
+   124→   124→      }
+   125→   125→    } catch {
+   126→   126→      // use defaults
+   127→   127→    } finally {
+   128→   128→      setLoading(false);
+   129→   129→    }
+   130→   130→  }, []);
+   131→   131→
+   132→   132→  useEffect(() => {
+   133→   133→    fetchSettings();
+   134→   134→  }, [fetchSettings]);
+   135→   135→
+   136→   136→  // ---------------------------------------------------------------------------
+   137→   137→  // Save settings (debounced)
+   138→   138→  // ---------------------------------------------------------------------------
+   139→   139→
+   140→   140→  const saveSettings = useCallback(async (newSettings: AppSettings) => {
+   141→   141→    setSaving(true);
+   142→   142→    try {
+   143→   143→      const res = await fetch('/api/settings', {
+   144→   144→        method: 'PATCH',
+   145→   145→        headers: { 'Content-Type': 'application/json' },
+   146→   146→        body: JSON.stringify(newSettings),
+   147→   147→      });
+   148→   148→      if (!res.ok) throw new Error('Save failed');
+   149→   149→    } catch {
+   150→   150→      toast.error('Failed to save settings');
+   151→   151→    } finally {
+   152→   152→      setSaving(false);
+   153→   153→    }
+   154→   154→  }, []);
+   155→   155→
+   156→   156→  const updateSetting = useCallback(
+   157→   157→    <K extends keyof AppSettings>(key: K, value: AppSettings[K]) => {
+   158→   158→      setSettings((prev) => {
+   159→   159→        const updated = { ...prev, [key]: value };
+   160→   160→        // Debounced save
+   161→   161→        if (debounceRef.current) clearTimeout(debounceRef.current);
+   162→   162→        debounceRef.current = setTimeout(() => {
+   163→   163→          saveSettings(updated);
+   164→   164→        }, 500);
+   165→   165→        return updated;
+   166→   166→      });
+   167→   167→    },
+   168→   168→    [saveSettings],
+   169→   169→  );
+   170→   170→
+   171→   171→  const updateAgentBudget = useCallback(
+   172→   172→    (agentId: string, value: number) => {
+   173→   173→      setSettings((prev) => {
+   174→   174→        const updated = {
+   175→   175→          ...prev,
+   176→   176→          agentBudgetLimits: { ...prev.agentBudgetLimits, [agentId]: value },
+   177→   177→        };
+   178→   178→        if (debounceRef.current) clearTimeout(debounceRef.current);
+   179→   179→        debounceRef.current = setTimeout(() => {
+   180→   180→          saveSettings(updated);
+   181→   181→        }, 500);
+   182→   182→        return updated;
+   183→   183→      });
+   184→   184→    },
+   185→   185→    [saveSettings],
+   186→   186→  );
+   187→   187→
+   188→   188→  const flashSave = useCallback((key: string) => {
+   189→   189→    setSaveFlash(key);
+   190→   190→    setTimeout(() => setSaveFlash(null), 1500);
+   191→   191→  }, []);
+   192→   192→
+   193→   193→  const handleResetCosts = useCallback(() => {
+   194→   194→    toast.success('Cost counters have been reset');
+   195→   195→  }, []);
+   196→   196→
+   197→   197→  // ---------------------------------------------------------------------------
+   198→   198→  // Render helpers
+   199→   199→  // ---------------------------------------------------------------------------
+   200→   200→
+   201→   201→  const renderSaveIndicator = (key: string) => {
+   202→   202→    if (saveFlash === key) {
+   203→   203→      return (
+   204→   204→        <span className="flex items-center gap-1 text-[10px] text-emerald-400">
+   205→   205→          <Check className="h-3 w-3" /> Saved
+   206→   206→        </span>
+   207→   207→      );
+   208→   208→    }
+   209→   209→    if (saving) {
+   210→   210→      return (
+   211→   211→        <span className="text-[10px] text-muted-foreground/70">Saving...</span>
+   212→   212→      );
+   213→   213→    }
+   214→   214→    return null;
+   215→   215→  };
+   216→   216→
+   217→   217→  // ---------------------------------------------------------------------------
+   218→   218→  // Render
+   219→   219→  // ---------------------------------------------------------------------------
+   220→   220→
+   221→   221→  return (
+   222→   222→    <TooltipProvider>
+   223→   223→      <div className="flex h-full flex-col min-h-0">
+   224→   224→        {/* Header */}
+   225→   225→        <div className="flex flex-col gap-1 border-b border-border/60 px-6 py-4">
+   226→   226→          <div className="flex items-center justify-between">
+   227→   227→            <div className="flex items-center gap-3">
+   228→   228→              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600/15 border border-violet-500/20">
+   229→   229→                <Settings className="h-4.5 w-4.5 text-violet-400" />
+   230→   230→              </div>
+   231→   231→              <div>
+   232→   232→                <h1 className="text-base font-semibold text-foreground">Settings</h1>
+   233→   233→                <p className="text-xs text-muted-foreground/70">Configure system preferences and orchestration parameters</p>
+   234→   234→              </div>
+   235→   235→            </div>
+   236→   236→          </div>
+   237→   237→        </div>
+   238→   238→
+   239→   239→        <ScrollArea className="flex-1 min-h-0">
+   240→   240→          <div className="mx-auto w-full max-w-3xl space-y-6 p-6">
+   241→   241→
+   242→   242→            {/* General Settings */}
+   243→   243→            <Card className="bg-card/80 border-border/60">
+   244→   244→              <CardHeader className="pb-3">
+   245→   245→                <CardTitle className="text-sm font-semibold text-secondary-foreground">General</CardTitle>
+   246→   246→                <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   247→   247→                  Appearance, language, and default behavior
+   248→   248→                </CardDescription>
+   249→   249→              </CardHeader>
+   250→   250→              <CardContent className="space-y-5">
+   251→   251→                {/* Theme */}
+   252→   252→                <div className="flex items-center justify-between">
+   253→   253→                  <div className="flex items-center gap-3">
+   254→   254→                    <div className="flex h-8 w-8 items-center justify-center rounded-lg">
+   255→   255→                      {settings.theme === 'dark' ? (
+   256→   256→                        <Moon className="h-4 w-4 text-violet-400" />
+   257→   257→                      ) : (
+   258→   258→                        <Sun className="h-4 w-4 text-amber-400" />
+   259→   259→                      )}
+   260→   260→                    </div>
+   261→   261→                    <div>
+   262→   262→                      <Label className="text-xs text-secondary-foreground">Theme</Label>
+   263→   263→                      <p className="text-[11px] text-muted-foreground/50">Switch between light and dark mode</p>
+   264→   264→                    </div>
+   265→   265→                  </div>
+   266→   266→                  <Select
+   267→   267→                    value={settings.theme}
+   268→   268→                    onValueChange={(v) => {
+   269→   269→                      const theme = v as 'dark' | 'light';
+   270→   270→                      setTheme(theme);
+   271→   271→                      updateSetting('theme', theme);
+   272→   272→                    }}
+   273→   273→                  >
+   274→   274→                    <SelectTrigger className="w-32 h-8">
+   275→   275→                      <SelectValue />
+   276→   276→                    </SelectTrigger>
+   277→   277→                    <SelectContent className="bg-popover border-border">
+   278→   278→                      <SelectItem value="dark" className="text-secondary-foreground">
+   279→   279→                        <div className="flex items-center gap-2"><Moon className="h-3 w-3" /> Dark</div>
+   280→   280→                      </SelectItem>
+   281→   281→                      <SelectItem value="light" className="text-secondary-foreground">
+   282→   282→                        <div className="flex items-center gap-2"><Sun className="h-3 w-3" /> Light</div>
+   283→   283→                      </SelectItem>
+   284→   284→                    </SelectContent>
+   285→   285→                  </Select>
+   286→   286→                </div>
+   287→   287→
+   288→   288→                <Separator  />
+   289→   289→
+   290→   290→                {/* Language */}
+   291→   291→                <div className="flex items-center justify-between">
+   292→   292→                  <div>
+   293→   293→                    <Label className="text-xs text-secondary-foreground">Language</Label>
+   294→   294→                    <p className="text-[11px] text-muted-foreground/50">Interface language</p>
+   295→   295→                  </div>
+   296→   296→                  <Select
+   297→   297→                    value={settings.language}
+   298→   298→                    onValueChange={(v) => updateSetting('language', v)}
+   299→   299→                  >
+   300→   300→                    <SelectTrigger className="w-32 h-8">
+   301→   301→                      <SelectValue />
+   302→   302→                    </SelectTrigger>
+   303→   303→                    <SelectContent className="bg-popover border-border">
+   304→   304→                      <SelectItem value="en" className="text-secondary-foreground">English</SelectItem>
+   305→   305→                    </SelectContent>
+   306→   306→                  </Select>
+   307→   307→                </div>
+   308→   308→
+   309→   309→                <Separator  />
+   310→   310→
+   311→   311→                {/* Default Debate Mode */}
+   312→   312→                <div className="flex items-center justify-between">
+   313→   313→                  <div>
+   314→   314→                    <Label className="text-xs text-secondary-foreground">Default Debate Mode</Label>
+   315→   315→                    <p className="text-[11px] text-muted-foreground/50">Orchestration mode for new sessions</p>
+   316→   316→                  </div>
+   317→   317→                  <Select
+   318→   318→                    value={settings.defaultDebateMode}
+   319→   319→                    onValueChange={(v) => updateSetting('defaultDebateMode', v as DebateMode)}
+   320→   320→                  >
+   321→   321→                    <SelectTrigger className="w-32 h-8">
+   322→   322→                      <SelectValue />
+   323→   323→                    </SelectTrigger>
+   324→   324→                    <SelectContent className="bg-popover border-border">
+   325→   325→                      <SelectItem value="fast" className="text-secondary-foreground">Fast</SelectItem>
+   326→   326→                      <SelectItem value="council" className="text-secondary-foreground">Council</SelectItem>
+   327→   327→                      <SelectItem value="redteam" className="text-secondary-foreground">Red Team</SelectItem>
+   328→   328→                    </SelectContent>
+   329→   329→                  </Select>
+   330→   330→                </div>
+   331→   331→
+   332→   332→                <Separator  />
+   333→   333→
+   334→   334→                {/* Auto-save */}
+   335→   335→                <div className="flex items-center justify-between">
+   336→   336→                  <div>
+   337→   337→                    <Label className="text-xs text-secondary-foreground">Auto-save</Label>
+   338→   338→                    <p className="text-[11px] text-muted-foreground/50">Automatically save chat sessions</p>
+   339→   339→                  </div>
+   340→   340→                  <Switch
+   341→   341→                    checked={settings.autoSave}
+   342→   342→                    onCheckedChange={(v) => { updateSetting('autoSave', v); flashSave('autoSave'); }}
+   343→   343→                    className="data-[state=checked]:bg-violet-600"
+   344→   344→                  />
+   345→   345→                </div>
+   346→   346→              </CardContent>
+   347→   347→            </Card>
+   348→   348→
+   349→   349→            {/* Cost Control */}
+   350→   350→            <Card className="bg-card/80 border-border/60">
+   351→   351→              <CardHeader className="pb-3">
+   352→   352→                <div className="flex items-center justify-between">
+   353→   353→                  <div>
+   354→   354→                    <CardTitle className="text-sm font-semibold text-secondary-foreground">Cost Control</CardTitle>
+   355→   355→                    <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   356→   356→                      Budget limits and spending alerts
+   357→   357→                    </CardDescription>
+   358→   358→                  </div>
+   359→   359→                  <Button
+   360→   360→                    variant="outline"
+   361→   361→                    size="sm"
+   362→   362→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground border-input hover:"
+   363→   363→                    onClick={handleResetCosts}
+   364→   364→                  >
+   365→   365→                    <RotateCcw className="h-3 w-3" />
+   366→   366→                    Reset Counters
+   367→   367→                  </Button>
+   368→   368→                </div>
+   369→   369→              </CardHeader>
+   370→   370→              <CardContent className="space-y-5">
+   371→   371→                {/* Per-session budget */}
+   372→   372→                <div className="space-y-2">
+   373→   373→                  <div className="flex items-center justify-between">
+   374→   374→                    <Label className="text-xs text-secondary-foreground">Per-Session Budget Limit</Label>
+   375→   375→                    {renderSaveIndicator('sessionBudget')}
+   376→   376→                  </div>
+   377→   377→                  <div className="flex items-center gap-2">
+   378→   378→                    <span className="text-sm text-muted-foreground/70 font-medium">$</span>
+   379→   379→                    <Input
+   380→   380→                      type="number"
+   381→   381→                      min={0}
+   382→   382→                      step={1}
+   383→   383→                      value={settings.sessionBudgetLimit}
+   384→   384→                      onChange={(e) => updateSetting('sessionBudgetLimit', parseFloat(e.target.value) || 0)}
+   385→   385→                      onBlur={() => flashSave('sessionBudget')}
+   386→   386→                      className="h-8 w-24"
+   387→   387→                    />
+   388→   388→                    <span className="text-[11px] text-muted-foreground/50">per session</span>
+   389→   389→                  </div>
+   390→   390→                </div>
+   391→   391→
+   392→   392→                <Separator  />
+   393→   393→
+   394→   394→                {/* Per-agent budget limits */}
+   395→   395→                <div className="space-y-3">
+   396→   396→                  <Label className="text-xs text-secondary-foreground">Per-Agent Budget Limits</Label>
+   397→   397→                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+   398→   398→                    {Object.entries(AGENT_LABELS).map(([agentId, { name, color }]) => (
+   399→   399→                      <div key={agentId} className="flex items-center justify-between rounded-lg">
+   400→   400→                        <span className={`text-xs font-medium ${color}`}>{name}</span>
+   401→   401→                        <div className="flex items-center gap-1.5">
+   402→   402→                          <span className="text-xs text-muted-foreground/70">$</span>
+   403→   403→                          <Input
+   404→   404→                            type="number"
+   405→   405→                            min={0}
+   406→   406→                            step={0.5}
+   407→   407→                            value={settings.agentBudgetLimits[agentId] ?? 0}
+   408→   408→                            onChange={(e) => updateAgentBudget(agentId, parseFloat(e.target.value) || 0)}
+   409→   409→                            onBlur={() => flashSave(`agent-${agentId}`)}
+   410→   410→                            className="h-7 w-16"
+   411→   411→                          />
+   412→   412→                        </div>
+   413→   413→                      </div>
+   414→   414→                    ))}
+   415→   415→                  </div>
+   416→   416→                </div>
+   417→   417→
+   418→   418→                <Separator  />
+   419→   419→
+   420→   420→                {/* Budget Alert Threshold */}
+   421→   421→                <div className="space-y-2">
+   422→   422→                  <div className="flex items-center justify-between">
+   423→   423→                    <Label className="text-xs text-secondary-foreground">Budget Alert Threshold</Label>
+   424→   424→                    <span className="text-xs font-mono text-violet-400">{settings.budgetAlertThreshold}%</span>
+   425→   425→                  </div>
+   426→   426→                  <Slider
+   427→   427→                    value={[settings.budgetAlertThreshold]}
+   428→   428→                    min={50}
+   429→   429→                    max={100}
+   430→   430→                    step={5}
+   431→   431→                    onValueChange={([v]) => { updateSetting('budgetAlertThreshold', v); flashSave('threshold'); }}
+   432→   432→                    className="py-1"
+   433→   433→                  />
+   434→   434→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   435→   435→                    {BUDGET_THRESHOLDS.map((t) => (
+   436→   436→                      <span key={t}>{t}%</span>
+   437→   437→                    ))}
+   438→   438→                  </div>
+   439→   439→                </div>
+   440→   440→              </CardContent>
+   441→   441→            </Card>
+   442→   442→
+   443→   443→            {/* Security */}
+   444→   444→            <Card className="bg-card/80 border-border/60">
+   445→   445→              <CardHeader className="pb-3">
+   446→   446→                <div className="flex items-center gap-2">
+   447→   447→                  <Shield className="h-4 w-4 text-muted-foreground/70" />
+   448→   448→                  <div>
+   449→   449→                    <CardTitle className="text-sm font-semibold text-secondary-foreground">Security</CardTitle>
+   450→   450→                    <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   451→   451→                      Sandbox, tool approvals, and audit settings
+   452→   452→                    </CardDescription>
+   453→   453→                  </div>
+   454→   454→                </div>
+   455→   455→              </CardHeader>
+   456→   456→              <CardContent className="space-y-5">
+   457→   457→                {/* Sandbox Mode */}
+   458→   458→                <div className="flex items-center justify-between">
+   459→   459→                  <div>
+   460→   460→                    <Label className="text-xs text-secondary-foreground">Sandbox Mode</Label>
+   461→   461→                    <p className="text-[11px] text-muted-foreground/50">Isolate tool execution in a sandboxed environment</p>
+   462→   462→                  </div>
+   463→   463→                  <Switch
+   464→   464→                    checked={settings.sandboxMode}
+   465→   465→                    onCheckedChange={(v) => { updateSetting('sandboxMode', v); flashSave('sandbox'); }}
+   466→   466→                    className="data-[state=checked]:bg-violet-600"
+   467→   467→                  />
+   468→   468→                </div>
+   469→   469→
+   470→   470→                <Separator  />
+   471→   471→
+   472→   472→                {/* Auto-approve Tools */}
+   473→   473→                <div className="flex items-center justify-between">
+   474→   474→                  <div>
+   475→   475→                    <Label className="text-xs text-secondary-foreground">Auto-approve Tools</Label>
+   476→   476→                    <p className="text-[11px] text-muted-foreground/50">Skip confirmation dialog before tool execution</p>
+   477→   477→                  </div>
+   478→   478→                  <Switch
+   479→   479→                    checked={settings.autoApproveTools}
+   480→   480→                    onCheckedChange={(v) => { updateSetting('autoApproveTools', v); flashSave('autoApprove'); }}
+   481→   481→                    className="data-[state=checked]:bg-violet-600"
+   482→   482→                  />
+   483→   483→                </div>
+   484→   484→
+   485→   485→                <Separator  />
+   486→   486→
+   487→   487→                {/* Audit Logging */}
+   488→   488→                <div className="flex items-center justify-between">
+   489→   489→                  <div>
+   490→   490→                    <Label className="text-xs text-secondary-foreground">Audit Logging</Label>
+   491→   491→                    <p className="text-[11px] text-muted-foreground/50">Log all agent actions for compliance review</p>
+   492→   492→                  </div>
+   493→   493→                  <Switch
+   494→   494→                    checked={settings.auditLogging}
+   495→   495→                    onCheckedChange={(v) => { updateSetting('auditLogging', v); flashSave('audit'); }}
+   496→   496→                    className="data-[state=checked]:bg-violet-600"
+   497→   497→                  />
+   498→   498→                </div>
+   499→   499→
+   500→   500→                <Separator  />
+   501→   501→
+   502→   502→                {/* Secret Storage */}
+   503→   503→                <div className="flex items-center justify-between">
+   504→   504→                  <div>
+   505→   505→                    <Label className="text-xs text-secondary-foreground">Secret Storage</Label>
+   506→   506→                    <p className="text-[11px] text-muted-foreground/50">Where API keys and credentials are stored</p>
+   507→   507→                  </div>
+   508→   508→                  <div className="flex items-center gap-2">
+   509→   509→                    <span className="text-xs font-mono text-muted-foreground">
+   510→   510→                      {settings.secretStorage}
+   511→   511→                    </span>
+   512→   512→                    <Badge
+   513→   513→                      variant="outline"
+   514→   514→                      className="text-[10px] h-4 px-1.5 border-emerald-700/30 bg-emerald-900/20 text-emerald-400"
+   515→   515→                    >
+   516→   516→                      Secure
+   517→   517→                    </Badge>
+   518→   518→                  </div>
+   519→   519→                </div>
+   520→   520→              </CardContent>
+   521→   521→            </Card>
+   522→   522→
+   523→   523→            {/* Advanced */}
+   524→   524→            <Card className="bg-card/80 border-border/60">
+   525→   525→              <CardHeader className="pb-3">
+   526→   526→                <CardTitle className="text-sm font-semibold text-secondary-foreground">Advanced</CardTitle>
+   527→   527→                <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   528→   528→                  Fine-tune orchestration behavior and system parameters
+   529→   529→                </CardDescription>
+   530→   530→              </CardHeader>
+   531→   531→              <CardContent className="space-y-5">
+   532→   532→                {/* Context Window Budget */}
+   533→   533→                <div className="space-y-2">
+   534→   534→                  <div className="flex items-center justify-between">
+   535→   535→                    <Label className="text-xs text-secondary-foreground">Context Window Budget</Label>
+   536→   536→                    <span className="text-xs font-mono text-violet-400">{settings.contextWindowBudget}%</span>
+   537→   537→                  </div>
+   538→   538→                  <Slider
+   539→   539→                    value={[settings.contextWindowBudget]}
+   540→   540→                    min={20}
+   541→   541→                    max={100}
+   542→   542→                    step={5}
+   543→   543→                    onValueChange={([v]) => updateSetting('contextWindowBudget', v)}
+   544→   544→                    className="py-1"
+   545→   545→                  />
+   546→   546→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   547→   547→                    <span>20%</span>
+   548→   548→                    <span>100%</span>
+   549→   549→                  </div>
+   550→   550→                </div>
+   551→   551→
+   552→   552→                <Separator  />
+   553→   553→
+   554→   554→                {/* Max Debate Rounds */}
+   555→   555→                <div className="space-y-2">
+   556→   556→                  <div className="flex items-center justify-between">
+   557→   557→                    <Label className="text-xs text-secondary-foreground">Max Debate Rounds</Label>
+   558→   558→                    <span className="text-xs font-mono text-violet-400">{settings.maxDebateRounds}</span>
+   559→   559→                  </div>
+   560→   560→                  <Slider
+   561→   561→                    value={[settings.maxDebateRounds]}
+   562→   562→                    min={1}
+   563→   563→                    max={10}
+   564→   564→                    step={1}
+   565→   565→                    onValueChange={([v]) => updateSetting('maxDebateRounds', v)}
+   566→   566→                    className="py-1"
+   567→   567→                  />
+   568→   568→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   569→   569→                    <span>1</span>
+   570→   570→                    <span>10</span>
+   571→   571→                  </div>
+   572→   572→                </div>
+   573→   573→
+   574→   574→                <Separator  />
+   575→   575→
+   576→   576→                {/* Fallback on Error */}
+   577→   577→                <div className="flex items-center justify-between">
+   578→   578→                  <div>
+   579→   579→                    <Label className="text-xs text-secondary-foreground">Fallback on Error</Label>
+   580→   580→                    <p className="text-[11px] text-muted-foreground/50">Use alternative provider if primary fails</p>
+   581→   581→                  </div>
+   582→   582→                  <Switch
+   583→   583→                    checked={settings.fallbackOnError}
+   584→   584→                    onCheckedChange={(v) => updateSetting('fallbackOnError', v)}
+   585→   585→                    className="data-[state=checked]:bg-violet-600"
+   586→   586→                  />
+   587→   587→                </div>
+   588→   588→
+   589→   589→                <Separator  />
+   590→   590→
+   591→   591→                {/* Telemetry */}
+   592→   592→                <div className="flex items-center justify-between">
+   593→   593→                  <div>
+   594→   594→                    <Label className="text-xs text-secondary-foreground">Telemetry</Label>
+   595→   595→                    <p className="text-[11px] text-muted-foreground/50">Send anonymous usage data to improve NEXUS</p>
+   596→   596→                  </div>
+   597→   597→                  <Switch
+   598→   598→                    checked={settings.telemetry}
+   599→   599→                    onCheckedChange={(v) => updateSetting('telemetry', v)}
+   600→   600→                    className="data-[state=checked]:bg-violet-600"
+   601→   601→                  />
+   602→   602→                </div>
+   603→   603→              </CardContent>
+   604→   604→            </Card>
+   605→   605→
+   606→   606→            {/* About */}
+   607→   607→            <Card className="bg-card/80 border-border/60">
+   608→   608→              <CardHeader className="pb-3">
+   609→   609→                <CardTitle className="text-sm font-semibold text-secondary-foreground">About</CardTitle>
+   610→   610→              </CardHeader>
+   611→   611→              <CardContent className="space-y-4">
+   612→   612→                <div className="flex items-center gap-3">
+   613→   613→                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-600/15 border border-violet-500/20">
+   614→   614→                    <span className="text-sm font-bold text-violet-400">N</span>
+   615→   615→                  </div>
+   616→   616→                  <div>
+   617→   617→                    <p className="text-sm font-semibold text-secondary-foreground">NEXUS</p>
+   618→   618→                    <p className="text-xs text-muted-foreground/70">Version 1.0.0</p>
+   619→   619→                  </div>
+   620→   620→                </div>
+   621→   621→                <p className="text-xs text-muted-foreground/70 leading-relaxed">
+   622→   622→                  Based on NEXUS Multi-Agent Orchestration Harness. A production-grade system for coordinating specialized LLM agents through structured debate and verification.
+   623→   623→                </p>
+   624→   624→                <div className="flex items-center gap-3 pt-1">
+   625→   625→                  <Button
+   626→   626→                    variant="ghost"
+   627→   627→                    size="sm"
+   628→   628→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground hover:"
+   629→   629→                  >
+   630→   630→                    <ExternalLink className="h-3 w-3" />
+   631→   631→                    Documentation
+   632→   632→                  </Button>
+   633→   633→                  <Button
+   634→   634→                    variant="ghost"
+   635→   635→                    size="sm"
+   636→   636→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground hover:"
+   637→   637→                  >
+   638→   638→                    <ExternalLink className="h-3 w-3" />
+   639→   639→                    GitHub
+   640→   640→                  </Button>
+   641→   641→                  <Button
+   642→   642→                    variant="ghost"
+   643→   643→                    size="sm"
+   644→   644→                    className="h-7 text-[11px] text-muted-foreground hover:text-secondary-foreground hover:"
+   645→   645→                  >
+   646→   646→                    <ExternalLink className="h-3 w-3" />
+   647→   647→                    Discord
+   648→   648→                  </Button>
+   649→   649→                </div>
+   650→   650→              </CardContent>
+   651→   651→            </Card>
+   652→   652→
+   653→   653→          </div>
+   654→   654→        </ScrollArea>
+   655→   655→      </div>
+   656→   656→    </TooltipProvider>
+   657→   657→  );
+   658→   658→}
+   659→   659→

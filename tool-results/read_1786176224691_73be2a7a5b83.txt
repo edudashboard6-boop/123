@@ -1,0 +1,683 @@
+   600→  messages,
+   601→}: {
+   602→  currentPhase?: DebatePhase;
+   603→  messages: ChatMessage[];
+   604→}) {
+   605→  const phaseOrder: DebatePhase[] = ['draft', 'critique', 'rebuttal', 'arbitrate', 'verify', 'commit'];
+   606→
+   607→  // Determine which phases have been reached based on messages
+   608→  const reachedPhases = new Set<DebatePhase>();
+   609→  messages.forEach((m) => {
+   610→    if (m.debateData) {
+   611→      reachedPhases.add(m.debateData.phase);
+   612→    }
+   613→  });
+   614→
+   615→  const currentIndex = currentPhase ? phaseOrder.indexOf(currentPhase) : -1;
+   616→
+   617→  return (
+   618→    <div className="space-y-1">
+   619→      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50 mb-2">Debate Timeline</p>
+   620→      <div className="space-y-0">
+   621→        {phaseOrder.map((phase, idx) => {
+   622→          const phaseDef = DEBATE_PHASES.find((p) => p.phase === phase);
+   623→          const isCompleted = reachedPhases.has(phase) && idx < currentIndex;
+   624→          const isActive = phase === currentPhase;
+   625→          const isPending = !reachedPhases.has(phase) && idx > currentIndex;
+   626→          const Icon = PHASE_ICONS[phase];
+   627→
+   628→          return (
+   629→            <div key={phase} className="flex items-start gap-2.5">
+   630→              {/* Vertical line + node */}
+   631→              <div className="flex flex-col items-center">
+   632→                <div
+   633→                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all ${
+   634→                    isCompleted
+   635→                      ? 'border-violet-500 bg-violet-500/20 text-violet-400'
+   636→                      : isActive
+   637→                        ? 'border-violet-400 bg-violet-500/10 text-violet-300 animate-pulse'
+   638→                        : 'border-input bg-muted text-muted-foreground/50'
+   639→                  }`}
+   640→                >
+   641→                  {isCompleted ? (
+   642→                    <CheckCircle className="h-3.5 w-3.5" />
+   643→                  ) : (
+   644→                    <Icon className="h-3.5 w-3.5" />
+   645→                  )}
+   646→                </div>
+   647→                {idx < phaseOrder.length - 1 && (
+   648→                  <div
+   649→                    className={`w-px h-5 ${
+   650→                      isCompleted ? 'bg-violet-500/40' : 'bg-muted'
+   651→                    }`}
+   652→                  />
+   653→                )}
+   654→              </div>
+   655→              {/* Label */}
+   656→              <div className="pt-1">
+   657→                <p
+   658→                  className={`text-xs font-medium ${
+   659→                    isCompleted || isActive ? 'text-secondary-foreground' : 'text-muted-foreground/50'
+   660→                  }`}
+   661→                >
+   662→                  {phaseDef?.label ?? phase}
+   663→                </p>
+   664→                {isActive && (
+   665→                  <p className="text-[10px] text-muted-foreground/70">{phaseDef?.description}</p>
+   666→                )}
+   667→              </div>
+   668→            </div>
+   669→          );
+   670→        })}
+   671→      </div>
+   672→    </div>
+   673→  );
+   674→}
+   675→
+   676→// ---------- Cost Breakdown ----------
+   677→function CostBreakdown({ messages }: { messages: ChatMessage[] }) {
+   678→  const agentMap = new Map<string, { tokens: number; cost: number; calls: number }>();
+   679→
+   680→  messages.forEach((m) => {
+   681→    if (m.role === 'system' || m.role === 'user') return;
+   682→    const existing = agentMap.get(m.agentName) ?? { tokens: 0, cost: 0, calls: 0 };
+   683→    agentMap.set(m.agentName, {
+   684→      tokens: existing.tokens + m.tokens,
+   685→      cost: existing.cost + m.cost,
+   686→      calls: existing.calls + 1,
+   687→    });
+   688→  });
+   689→
+   690→  const entries = Array.from(agentMap.entries());
+   691→  if (entries.length === 0) return null;
+   692→
+   693→  const maxTokens = Math.max(...entries.map(([, v]) => v.tokens), 1);
+   694→
+   695→  return (
+   696→    <div className="space-y-2">
+   697→      <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Cost Breakdown</p>
+   698→      <div className="space-y-2.5">
+   699→        {entries.map(([name, data]) => {
+   700→          const agentDef = DEFAULT_AGENTS.find((a) => a.name === name);
+   701→          const pct = (data.tokens / maxTokens) * 100;
+   702→          return (
+   703→            <div key={name} className="space-y-1">
+   704→              <div className="flex items-center justify-between">
+   705→                <div className="flex items-center gap-2">
+   706→                  <div
+   707→                    className={`h-2 w-2 rounded-full ${
+   708→                      agentDef ? agentDef.color.replace('text-', 'bg-') : 'bg-accent'
+   709→                    }`}
+   710→                  />
+   711→                  <span className="text-xs text-secondary-foreground">{name}</span>
+   712→                </div>
+   713→                <div className="flex items-center gap-2 text-[10px] text-muted-foreground/70">
+   714→                  <span>{data.tokens.toLocaleString()} tok</span>
+   715→                  <span>${data.cost.toFixed(4)}</span>
+   716→                </div>
+   717→              </div>
+   718→              <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+   719→                <div
+   720→                  className={`h-full rounded-full transition-all ${
+   721→                    agentDef ? agentDef.color.replace('text-', 'bg-') : 'bg-accent'
+   722→                  }`}
+   723→                  style={{ width: `${pct}%` }}
+   724→                />
+   725→              </div>
+   726→            </div>
+   727→          );
+   728→        })}
+   729→      </div>
+   730→    </div>
+   731→  );
+   732→}
+   733→
+   734→// ---------- Right Panel Content ----------
+   735→function RightPanelContent({
+   736→  messages,
+   737→  session,
+   738→  searchResults,
+   739→}: {
+   740→  messages: ChatMessage[];
+   741→  session: ChatSession | null;
+   742→  searchResults: WebSearchResult[];
+   743→}) {
+   744→  const mode = session?.mode ?? 'fast';
+   745→  const isDebateMode = mode !== 'fast';
+   746→
+   747→  // Get active agents from messages
+   748→  const activeAgents = new Set<AgentId>();
+   749→  messages.forEach((m) => {
+   750→    if (m.role !== 'user' && m.role !== 'system') {
+   751→      activeAgents.add(m.role as AgentId);
+   752→    }
+   753→  });
+   754→
+   755→  // Get current debate phase
+   756→  const lastDebateMsg = [...messages].reverse().find((m) => m.debateData);
+   757→  const currentPhase = lastDebateMsg?.debateData?.phase;
+   758→
+   759→  return (
+   760→    <ScrollArea className="h-full">
+   761→      <div className="space-y-5 p-4">
+   762→        {/* Session Info */}
+   763→        {session && (
+   764→          <div className="space-y-2.5">
+   765→            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Session Info</p>
+   766→            <div className="rounded-lg border border-border bg-card/50 p-3 space-y-2">
+   767→              <div className="flex items-center justify-between">
+   768→                <span className="text-xs text-muted-foreground/70">Mode</span>
+   769→                <Badge variant="outline" className={`text-[10px] px-1.5 py-0 h-5 border ${MODE_STYLES[mode]}`}>
+   770→                  {MODE_LABELS[mode]}
+   771→                </Badge>
+   772→              </div>
+   773→              <div className="flex items-center justify-between">
+   774→                <span className="text-xs text-muted-foreground/70">Created</span>
+   775→                <span className="text-xs text-muted-foreground">
+   776→                  {formatDistanceToNow(new Date(session.createdAt), { addSuffix: true })}
+   777→                </span>
+   778→              </div>
+   779→              <div className="flex items-center justify-between">
+   780→                <span className="text-xs text-muted-foreground/70">Messages</span>
+   781→                <span className="text-xs text-muted-foreground">{messages.length}</span>
+   782→              </div>
+   783→            </div>
+   784→          </div>
+   785→        )}
+   786→
+   787→        <Separator  />
+   788→
+   789→        {/* Active Agents */}
+   790→        <div className="space-y-2.5">
+   791→          <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Active Agents</p>
+   792→          <div className="space-y-1.5">
+   793→            {DEFAULT_AGENTS.map((agent) => {
+   794→              const isActive = activeAgents.has(agent.agentId);
+   795→              const Icon = AGENT_ICON_MAP[agent.agentId];
+   796→              return (
+   797→                <div
+   798→                  key={agent.agentId}
+   799→                  className={`flex items-center gap-2.5 rounded-lg px-3 py-2 transition-colors ${
+   800→                    isActive ? 'bg-card/60 border border-border' : 'opacity-40'
+   801→                  }`}
+   802→                >
+   803→                  <div
+   804→                    className={`flex h-6 w-6 items-center justify-center rounded-full ${
+   805→                      isActive ? agent.color.replace('text-', 'bg-').replace('-500', '-600') + '/20' : 'bg-muted'
+   806→                    }`}
+   807→                  >
+   808→                    <Icon className={`h-3 w-3 ${isActive ? agent.color : 'text-muted-foreground/50'}`} />
+   809→                  </div>
+   810→                  <span className={`text-xs ${isActive ? 'text-secondary-foreground' : 'text-muted-foreground/50'}`}>
+   811→                    {agent.name}
+   812→                  </span>
+   813→                  {isActive && (
+   814→                    <div className="ml-auto h-1.5 w-1.5 rounded-full bg-green-400" />
+   815→                  )}
+   816→                </div>
+   817→              );
+   818→            })}
+   819→          </div>
+   820→        </div>
+   821→
+   822→        {/* Debate Timeline */}
+   823→        {isDebateMode && (
+   824→          <>
+   825→            <Separator  />
+   826→            <DebateTimeline currentPhase={currentPhase} messages={messages} />
+   827→          </>
+   828→        )}
+   829→
+   830→        {/* Cost Breakdown */}
+   831→        <>
+   832→          <Separator  />
+   833→          <CostBreakdown messages={messages} />
+   834→        </>
+   835→
+   836→        {/* Web Search Results */}
+   837→        {searchResults.length > 0 && (
+   838→          <>
+   839→            <Separator  />
+   840→            <div className="space-y-2.5">
+   841→              <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/50">Search Results</p>
+   842→              <div className="space-y-2 max-h-64 overflow-y-auto">
+   843→                {searchResults.map((result, i) => (
+   844→                  <a
+   845→                    key={i}
+   846→                    href={result.url}
+   847→                    target="_blank"
+   848→                    rel="noopener noreferrer"
+   849→                    className="block rounded-lg border border-border bg-card/40 p-3 transition-colors hover:border-input hover:bg-card/60"
+   850→                  >
+   851→                    <p className="text-xs font-medium text-violet-400 mb-1 line-clamp-1">
+   852→                      {result.title}
+   853→                    </p>
+   854→                    <p className="text-[10px] text-muted-foreground/70 line-clamp-2 leading-relaxed">
+   855→                      {result.snippet}
+   856→                    </p>
+   857→                    <p className="text-[10px] text-muted-foreground/50 mt-1.5 truncate">
+   858→                      {result.url}
+   859→                    </p>
+   860→                  </a>
+   861→                ))}
+   862→              </div>
+   863→            </div>
+   864→          </>
+   865→        )}
+   866→      </div>
+   867→    </ScrollArea>
+   868→  );
+   869→}
+   870→
+   871→// =============================================================================
+   872→// Main ChatPanel
+   873→// =============================================================================
+   874→
+   875→export function ChatPanel() {
+   876→  const {
+   877→    messages,
+   878→    sessions,
+   879→    activeSessionId,
+   880→    loading,
+   881→    error,
+   882→    totalTokens,
+   883→    totalCost,
+   884→    sendMessage,
+   885→    createSession,
+   886→    deleteSession,
+   887→    loadSessionMessages,
+   888→    clearMessages,
+   889→  } = useChatStore();
+   890→
+   891→  const { isProcessing, setIsProcessing, debateMode, activeSessionId: uiSessionId } = useUiStore();
+   892→
+   893→  const [input, setInput] = useState('');
+   894→  const [isEditingTitle, setIsEditingTitle] = useState(false);
+   895→  const [editTitle, setEditTitle] = useState('');
+   896→  const [showWebSearch, setShowWebSearch] = useState(false);
+   897→  const [searchQuery, setSearchQuery] = useState('');
+   898→  const [searchResults, setSearchResults] = useState<WebSearchResult[]>([]);
+   899→  const [searching, setSearching] = useState(false);
+   900→
+   901→  const messagesEndRef = useRef<HTMLDivElement>(null);
+   902→  const textareaRef = useRef<HTMLTextAreaElement>(null);
+   903→
+   904→  // Derived state
+   905→  const activeSession = sessions.find((s) => s.id === activeSessionId) ?? null;
+   906→  const effectiveSessionId = activeSessionId;
+   907→  const hasMessages = messages.length > 0;
+   908→  const isDebateMode = activeSession?.mode !== 'fast';
+   909→
+   910→  // Auto-scroll to bottom on new messages
+   911→  useEffect(() => {
+   912→    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+   913→  }, [messages]);
+   914→
+   915→  // Sync processing state with loading
+   916→  useEffect(() => {
+   917→    setIsProcessing(loading);
+   918→  }, [loading, setIsProcessing]);
+   919→
+   920→  // Handle send
+   921→  const handleSend = useCallback(async () => {
+   922→    const trimmed = input.trim();
+   923→    if (!trimmed || isProcessing) return;
+   924→
+   925→    // Create a session if none active
+   926→    let sessionId = effectiveSessionId;
+   927→    if (!sessionId) {
+   928→      sessionId = await createSession(undefined, debateMode);
+   929→    }
+   930→
+   931→    setInput('');
+   932→    setShowWebSearch(false);
+   933→    await sendMessage(trimmed);
+   934→  }, [input, isProcessing, effectiveSessionId, debateMode, createSession, sendMessage]);
+   935→
+   936→  // Handle keyboard
+   937→  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+   938→    if (e.key === 'Enter' && !e.shiftKey) {
+   939→      e.preventDefault();
+   940→      handleSend();
+   941→    }
+   942→  };
+   943→
+   944→  // Handle suggestion click
+   945→  const handleSuggestionClick = useCallback((text: string) => {
+   946→    setInput(text);
+   947→    textareaRef.current?.focus();
+   948→  }, []);
+   949→
+   950→  // Handle delete session
+   951→  const handleDeleteSession = useCallback(async () => {
+   952→    if (effectiveSessionId) {
+   953→      await deleteSession(effectiveSessionId);
+   954→    }
+   955→  }, [effectiveSessionId, deleteSession]);
+   956→
+   957→  // Handle title edit
+   958→  const handleStartEditTitle = () => {
+   959→    setEditTitle(activeSession?.title ?? 'New Session');
+   960→    setIsEditingTitle(true);
+   961→  };
+   962→
+   963→  const handleSaveTitle = () => {
+   964→    setIsEditingTitle(false);
+   965→    // In a real app, we'd PATCH the session title
+   966→  };
+   967→
+   968→  // Handle web search
+   969→  const handleWebSearch = async () => {
+   970→    const q = searchQuery.trim();
+   971→    if (!q) return;
+   972→
+   973→    setSearching(true);
+   974→    try {
+   975→      const res = await fetch('/api/web-search', {
+   976→        method: 'POST',
+   977→        headers: { 'Content-Type': 'application/json' },
+   978→        body: JSON.stringify({ query: q }),
+   979→      });
+   980→      if (res.ok) {
+   981→        const data = await res.json();
+   982→        setSearchResults(data.results ?? []);
+   983→      }
+   984→    } catch {
+   985→      // Silently fail
+   986→    } finally {
+   987→      setSearching(false);
+   988→    }
+   989→  };
+   990→
+   991→  // Handle search result click (insert context into input)
+   992→  const handleSearchResultClick = (result: WebSearchResult) => {
+   993→    setInput((prev) => {
+   994→      const context = `\n\n[Web Context: ${result.title}]\n${result.snippet}`;
+   995→      return prev + context;
+   996→    });
+   997→    textareaRef.current?.focus();
+   998→  };
+   999→
+  1000→  // Handle stop
+  1001→  const handleStop = () => {
+  1002→    setIsProcessing(false);
+  1003→  };
+  1004→
+  1005→  const tokenEstimate = estimateTokens(input);
+  1006→
+  1007→  return (
+  1008→    <div className="flex h-full bg-background">
+  1009→      <ResizablePanelGroup direction="horizontal" className="h-full">
+  1010→        {/* ================================================================== */}
+  1011→        {/* Left Panel: Chat Messages                                           */}
+  1012→        {/* ================================================================== */}
+  1013→        <ResizablePanel defaultSize={70} minSize={40}>
+  1014→          <div className="flex h-full min-h-0 flex-col">
+  1015→            {/* Session Header */}
+  1016→            {activeSession && (
+  1017→              <div className="flex items-center justify-between border-b border-border/60 bg-background/80 backdrop-blur-sm px-4 py-2.5">
+  1018→                <div className="flex items-center gap-2.5">
+  1019→                  {isEditingTitle ? (
+  1020→                    <input
+  1021→                      autoFocus
+  1022→                      value={editTitle}
+  1023→                      onChange={(e) => setEditTitle(e.target.value)}
+  1024→                      onBlur={handleSaveTitle}
+  1025→                      onKeyDown={(e) => {
+  1026→                        if (e.key === 'Enter') handleSaveTitle();
+  1027→                        if (e.key === 'Escape') setIsEditingTitle(false);
+  1028→                      }}
+  1029→                      className="bg-transparent text-sm font-semibold text-foreground outline-none border-b border-violet-500/40 px-1 py-0.5"
+  1030→                    />
+  1031→                  ) : (
+  1032→                    <button
+  1033→                      onClick={handleStartEditTitle}
+  1034→                      className="flex items-center gap-2 group"
+  1035→                    >
+  1036→                      <span className="text-sm font-semibold text-foreground group-hover:text-violet-300 transition-colors">
+  1037→                        {activeSession.title}
+  1038→                      </span>
+  1039→                      <Edit className="h-3 w-3 text-muted-foreground/50 opacity-0 group-hover:opacity-100 transition-opacity" />
+  1040→                    </button>
+  1041→                  )}
+  1042→                  <Badge
+  1043→                    variant="outline"
+  1044→                    className={`text-[10px] px-1.5 py-0 h-5 border ${MODE_STYLES[activeSession.mode]}`}
+  1045→                  >
+  1046→                    {MODE_LABELS[activeSession.mode]}
+  1047→                  </Badge>
+  1048→                </div>
+  1049→                <div className="flex items-center gap-1">
+  1050→                  <Tooltip>
+  1051→                    <TooltipTrigger asChild>
+  1052→                      <Button
+  1053→                        variant="ghost"
+  1054→                        size="icon"
+  1055→                        className="h-7 w-7 text-muted-foreground/70 hover:text-red-400 hover:bg-red-500/10"
+  1056→                        onClick={handleDeleteSession}
+  1057→                      >
+  1058→                        <Trash2 className="h-3.5 w-3.5" />
+  1059→                      </Button>
+  1060→                    </TooltipTrigger>
+  1061→                    <TooltipContent side="bottom">Delete session</TooltipContent>
+  1062→                  </Tooltip>
+  1063→                </div>
+  1064→              </div>
+  1065→            )}
+  1066→
+  1067→            {/* Messages Area / Empty State */}
+  1068→            {!hasMessages && !isProcessing ? (
+  1069→              <div className="flex-1">
+  1070→                <EmptyState onSuggestionClick={handleSuggestionClick} />
+  1071→              </div>
+  1072→            ) : (
+  1073→              <ScrollArea className="flex-1 min-h-0">
+  1074→                <div className="flex flex-col py-4">
+  1075→                  <AnimatePresence mode="popLayout">
+  1076→                    {messages.map((message) => (
+  1077→                      <MessageBubble key={message.id} message={message} />
+  1078→                    ))}
+  1079→                  </AnimatePresence>
+  1080→
+  1081→                  {/* Typing Indicator */}
+  1082→                  <AnimatePresence>
+  1083→                    {isProcessing && (
+  1084→                      <TypingIndicator
+  1085→                        agentName={
+  1086→                          isDebateMode ? 'NEXUS Council' : 'Architect'
+  1087→                        }
+  1088→                      />
+  1089→                    )}
+  1090→                  </AnimatePresence>
+  1091→
+  1092→                  {/* Error banner */}
+  1093→                  {error && (
+  1094→                    <motion.div
+  1095→                      initial={{ opacity: 0, y: 10 }}
+  1096→                      animate={{ opacity: 1, y: 0 }}
+  1097→                      className="mx-4 my-2 rounded-lg border border-red-500/30 bg-red-500/10 p-3"
+  1098→                    >
+  1099→                      <div className="flex items-center gap-2">
+  1100→                        <AlertCircle className="h-4 w-4 text-red-400 shrink-0" />
+  1101→                        <p className="text-xs text-red-300">{error}</p>
+  1102→                      </div>
+  1103→                    </motion.div>
+  1104→                  )}
+  1105→
+  1106→                  <div ref={messagesEndRef} />
+  1107→                </div>
+  1108→              </ScrollArea>
+  1109→            )}
+  1110→
+  1111→            {/* Chat Input Area */}
+  1112→            <div className="shrink-0 border-t border-border/60 bg-background/80 backdrop-blur-sm">
+  1113→              {/* Web Search Inline Bar */}
+  1114→              <AnimatePresence>
+  1115→                {showWebSearch && (
+  1116→                  <motion.div
+  1117→                    initial={{ height: 0, opacity: 0 }}
+  1118→                    animate={{ height: 'auto', opacity: 1 }}
+  1119→                    exit={{ height: 0, opacity: 0 }}
+  1120→                    className="overflow-hidden"
+  1121→                  >
+  1122→                    <div className="flex items-center gap-2 px-4 py-2 border-b border-border/40">
+  1123→                      <Search className="h-3.5 w-3.5 text-muted-foreground/70 shrink-0" />
+  1124→                      <Input
+  1125→                        value={searchQuery}
+  1126→                        onChange={(e) => setSearchQuery(e.target.value)}
+  1127→                        onKeyDown={(e) => {
+  1128→                          if (e.key === 'Enter') handleWebSearch();
+  1129→                        }}
+  1130→                        placeholder="Search the web..."
+  1131→                        className="h-7 border-border bg-card/50 text-xs text-secondary-foreground placeholder:text-muted-foreground/50 focus-visible:ring-violet-500/30"
+  1132→                        disabled={searching}
+  1133→                      />
+  1134→                      <Button
+  1135→                        size="sm"
+  1136→                        variant="ghost"
+  1137→                        onClick={handleWebSearch}
+  1138→                        disabled={searching || !searchQuery.trim()}
+  1139→                        className="h-7 px-2 text-xs text-muted-foreground hover:text-secondary-foreground"
+  1140→                      >
+  1141→                        {searching ? '...' : 'Go'}
+  1142→                      </Button>
+  1143→                    </div>
+  1144→                  </motion.div>
+  1145→                )}
+  1146→              </AnimatePresence>
+  1147→
+  1148→              {/* Toolbar + Input */}
+  1149→              <div className="px-4 pb-3 pt-2">
+  1150→                {/* Toolbar */}
+  1151→                <div className="flex items-center gap-1 mb-2">
+  1152→                  <Tooltip>
+  1153→                    <TooltipTrigger asChild>
+  1154→                      <Button
+  1155→                        variant={showWebSearch ? 'secondary' : 'ghost'}
+  1156→                        size="icon"
+  1157→                        className={`h-7 w-7 ${showWebSearch ? 'bg-violet-500/10 text-violet-400 hover:bg-violet-500/20' : 'text-muted-foreground/70 hover:text-secondary-foreground hover:bg-muted'}`}
+  1158→                        onClick={() => setShowWebSearch(!showWebSearch)}
+  1159→                      >
+  1160→                        <Globe className="h-3.5 w-3.5" />
+  1161→                      </Button>
+  1162→                    </TooltipTrigger>
+  1163→                    <TooltipContent side="top">Web Search</TooltipContent>
+  1164→                  </Tooltip>
+  1165→
+  1166→                  <Tooltip>
+  1167→                    <TooltipTrigger asChild>
+  1168→                      <Button
+  1169→                        variant="ghost"
+  1170→                        size="icon"
+  1171→                        className="h-7 w-7 text-muted-foreground/70 hover:text-secondary-foreground hover:bg-muted"
+  1172→                      >
+  1173→                        <Paperclip className="h-3.5 w-3.5" />
+  1174→                      </Button>
+  1175→                    </TooltipTrigger>
+  1176→                    <TooltipContent side="top">Attach File</TooltipContent>
+  1177→                  </Tooltip>
+  1178→
+  1179→                  <Tooltip>
+  1180→                    <TooltipTrigger asChild>
+  1181→                      <Button
+  1182→                        variant="ghost"
+  1183→                        size="icon"
+  1184→                        className="h-7 w-7 text-muted-foreground/70 hover:text-secondary-foreground hover:bg-muted"
+  1185→                      >
+  1186→                        <Database className="h-3.5 w-3.5" />
+  1187→                      </Button>
+  1188→                    </TooltipTrigger>
+  1189→                    <TooltipContent side="top">RAG Search</TooltipContent>
+  1190→                  </Tooltip>
+  1191→
+  1192→                  {/* Spacer */}
+  1193→                  <div className="flex-1" />
+  1194→
+  1195→                  {/* Token / char count */}
+  1196→                  {input.length > 0 && (
+  1197→                    <span className="text-[10px] text-muted-foreground/50 tabular-nums">
+  1198→                      ~{tokenEstimate} tokens
+  1199→                    </span>
+  1200→                  )}
+  1201→                </div>
+  1202→
+  1203→                {/* Input row */}
+  1204→                <div className="relative flex items-end gap-2 rounded-xl border border-border bg-card/50 focus-within:border-violet-500/40 transition-colors">
+  1205→                  <Textarea
+  1206→                    ref={textareaRef}
+  1207→                    value={input}
+  1208→                    onChange={(e) => setInput(e.target.value)}
+  1209→                    onKeyDown={handleKeyDown}
+  1210→                    placeholder="Message NEXUS..."
+  1211→                    className="flex-1 resize-none border-0 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[120px] py-2.5 px-3"
+  1212→                    rows={1}
+  1213→                    disabled={isProcessing}
+  1214→                    onInput={(e) => {
+  1215→                      const target = e.target as HTMLTextAreaElement;
+  1216→                      target.style.height = 'auto';
+  1217→                      target.style.height = Math.min(target.scrollHeight, 120) + 'px';
+  1218→                    }}
+  1219→                  />
+  1220→                  {isProcessing ? (
+  1221→                    <Tooltip>
+  1222→                      <TooltipTrigger asChild>
+  1223→                        <Button
+  1224→                          size="icon"
+  1225→                          variant="ghost"
+  1226→                          onClick={handleStop}
+  1227→                          className="h-8 w-8 mr-2 mb-2 shrink-0 text-muted-foreground hover:text-red-400 hover:bg-red-500/10"
+  1228→                        >
+  1229→                          <StopCircle className="h-4 w-4" />
+  1230→                        </Button>
+  1231→                      </TooltipTrigger>
+  1232→                      <TooltipContent side="top">Stop generation</TooltipContent>
+  1233→                    </Tooltip>
+  1234→                  ) : (
+  1235→                    <Tooltip>
+  1236→                      <TooltipTrigger asChild>
+  1237→                        <Button
+  1238→                          size="icon"
+  1239→                          onClick={handleSend}
+  1240→                          disabled={!input.trim()}
+  1241→                          className="h-8 w-8 mr-2 mb-2 shrink-0 bg-violet-600 hover:bg-violet-500 text-white disabled:opacity-30 disabled:bg-muted"
+  1242→                        >
+  1243→                          <Send className="h-4 w-4" />
+  1244→                        </Button>
+  1245→                      </TooltipTrigger>
+  1246→                      <TooltipContent side="top">Send message</TooltipContent>
+  1247→                    </Tooltip>
+  1248→                  )}
+  1249→                </div>
+  1250→
+  1251→                {/* Footer hint */}
+  1252→                <p className="text-[10px] text-muted-foreground/50 mt-1.5 text-center">
+  1253→                  Press <kbd className="rounded border border-border bg-card px-1 py-0.5 text-[9px] font-mono">Enter</kbd> to send,{' '}
+  1254→                  <kbd className="rounded border border-border bg-card px-1 py-0.5 text-[9px] font-mono">Shift+Enter</kbd> for new line
+  1255→                </p>
+  1256→              </div>
+  1257→            </div>
+  1258→          </div>
+  1259→        </ResizablePanel>
+  1260→
+  1261→        {/* ================================================================== */}
+  1262→        {/* Right Panel: Session Info, Debate, Cost                            */}
+  1263→        {/* ================================================================== */}
+  1264→        <ResizableHandle withHandle className="bg-muted hover:bg-accent transition-colors" />
+  1265→        <ResizablePanel defaultSize={30} minSize={20}>
+  1266→          <div className="h-full border-l border-border/60 bg-background">
+  1267→            <div className="flex items-center border-b border-border/60 px-4 py-2.5">
+  1268→              <MessageSquare className="h-3.5 w-3.5 text-muted-foreground/70 mr-2" />
+  1269→              <span className="text-xs font-medium text-muted-foreground">Details</span>
+  1270→            </div>
+  1271→            <RightPanelContent
+  1272→              messages={messages}
+  1273→              session={activeSession}
+  1274→              searchResults={searchResults}
+  1275→            />
+  1276→          </div>
+  1277→        </ResizablePanel>
+  1278→      </ResizablePanelGroup>
+  1279→    </div>
+  1280→  );
+  1281→}
+  1282→

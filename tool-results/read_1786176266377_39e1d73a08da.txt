@@ -1,0 +1,603 @@
+    60→  AccordionContent,
+    61→  AccordionItem,
+    62→  AccordionTrigger,
+    63→} from '@/components/ui/accordion';
+    64→import { Skeleton } from '@/components/ui/skeleton';
+    65→
+    66→import type { Document } from '@/lib/types';
+    67→
+    68→// -----------------------------------------------------------------------------
+    69→// Helpers
+    70→// -----------------------------------------------------------------------------
+    71→
+    72→const ACCEPTED_EXTENSIONS = ['.txt', '.md', '.pdf', '.json', '.csv', '.py', '.js', '.ts'];
+    73→const ACCEPTED_MIME = '.txt,.md,.pdf,.json,.csv,.py,.js,.ts';
+    74→
+    75→function formatFileSize(bytes: number): string {
+    76→  if (bytes < 1024) return `${bytes} B`;
+    77→  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    78→  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    79→}
+    80→
+    81→function relativeTime(dateStr: string): string {
+    82→  const now = Date.now();
+    83→  const then = new Date(dateStr).getTime();
+    84→  const diff = now - then;
+    85→  const mins = Math.floor(diff / 60000);
+    86→  if (mins < 1) return 'just now';
+    87→  if (mins < 60) return `${mins}m ago`;
+    88→  const hrs = Math.floor(mins / 60);
+    89→  if (hrs < 24) return `${hrs}h ago`;
+    90→  const days = Math.floor(hrs / 24);
+    91→  if (days < 30) return `${days}d ago`;
+    92→  return new Date(dateStr).toLocaleDateString();
+    93→}
+    94→
+    95→function fileIconForType(fileType: string) {
+    96→  if (fileType === 'json') return FileJson;
+    97→  if (['py', 'js', 'ts', 'csv'].includes(fileType)) return FileCode;
+    98→  return FileText;
+    99→}
+   100→
+   101→function categoryColor(category: string): string {
+   102→  switch (category) {
+   103→    case 'text': return 'bg-accent/50 text-secondary-foreground border-border/50';
+   104→    case 'code': return 'bg-emerald-900/30 text-emerald-400 border-emerald-700/40';
+   105→    case 'data': return 'bg-amber-900/30 text-amber-400 border-amber-700/40';
+   106→    default: return 'bg-violet-900/30 text-violet-400 border-violet-700/40';
+   107→  }
+   108→}
+   109→
+   110→function fileCategory(fileType: string): string {
+   111→  if (['py', 'js', 'ts'].includes(fileType)) return 'code';
+   112→  if (['json', 'csv'].includes(fileType)) return 'data';
+   113→  return 'text';
+   114→}
+   115→
+   116→// -----------------------------------------------------------------------------
+   117→// Component
+   118→// -----------------------------------------------------------------------------
+   119→
+   120→export function KnowledgeBase() {
+   121→  const [documents, setDocuments] = useState<Document[]>([]);
+   122→  const [loading, setLoading] = useState(true);
+   123→  const [uploading, setUploading] = useState(false);
+   124→  const [uploadProgress, setUploadProgress] = useState(0);
+   125→  const [dragOver, setDragOver] = useState(false);
+   126→  const [activeWorkspace, setActiveWorkspace] = useState('default');
+   127→
+   128→  // RAG settings
+   129→  const [ragSettings, setRagSettings] = useState({
+   130→    chunkSize: 1000,
+   131→    chunkOverlap: 200,
+   132→    embeddingModel: 'text-embedding-3-small',
+   133→    topK: 5,
+   134→    similarityThreshold: 0.7,
+   135→  });
+   136→
+   137→  // Delete confirmation
+   138→  const [deleteTarget, setDeleteTarget] = useState<Document | null>(null);
+   139→  const [deleting, setDeleting] = useState(false);
+   140→
+   141→  // Test RAG dialog
+   142→  const [testDialogOpen, setTestDialogOpen] = useState(false);
+   143→  const [testQuery, setTestQuery] = useState('');
+   144→  const [testResults, setTestResults] = useState<Array<{ text: string; score: number }>>([]);
+   145→  const [testLoading, setTestLoading] = useState(false);
+   146→
+   147→  const fileInputRef = useRef<HTMLInputElement>(null);
+   148→
+   149→  // ---------------------------------------------------------------------------
+   150→  // Fetch documents
+   151→  // ---------------------------------------------------------------------------
+   152→
+   153→  const fetchDocuments = useCallback(async () => {
+   154→    setLoading(true);
+   155→    try {
+   156→      const res = await fetch('/api/documents');
+   157→      if (!res.ok) throw new Error('Failed to fetch documents');
+   158→      const data: Document[] = await res.json();
+   159→      setDocuments(data);
+   160→    } catch {
+   161→      setDocuments([]);
+   162→    } finally {
+   163→      setLoading(false);
+   164→    }
+   165→  }, []);
+   166→
+   167→  useEffect(() => {
+   168→    fetchDocuments();
+   169→  }, [fetchDocuments]);
+   170→
+   171→  // ---------------------------------------------------------------------------
+   172→  // Upload
+   173→  // ---------------------------------------------------------------------------
+   174→
+   175→  const handleUpload = useCallback(async (file: File) => {
+   176→    const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+   177→    if (!ACCEPTED_EXTENSIONS.includes(ext)) {
+   178→      toast.error(`Unsupported file type: ${ext}`);
+   179→      return;
+   180→    }
+   181→
+   182→    setUploading(true);
+   183→    setUploadProgress(0);
+   184→
+   185→    // Simulate progress ticks
+   186→    const progressInterval = setInterval(() => {
+   187→      setUploadProgress((p) => Math.min(p + Math.random() * 15, 90));
+   188→    }, 200);
+   189→
+   190→    try {
+   191→      const formData = new FormData();
+   192→      formData.append('file', file);
+   193→      formData.append('workspaceId', activeWorkspace);
+   194→
+   195→      const res = await fetch('/api/documents', {
+   196→        method: 'POST',
+   197→        body: formData,
+   198→      });
+   199→
+   200→      clearInterval(progressInterval);
+   201→      setUploadProgress(100);
+   202→
+   203→      if (!res.ok) {
+   204→        const body = await res.json().catch(() => ({}));
+   205→        throw new Error(body.error ?? 'Upload failed');
+   206→      }
+   207→
+   208→      const created: Document = await res.json();
+   209→      setDocuments((prev) => [...prev, created]);
+   210→      toast.success(`Uploaded ${created.filename}`);
+   211→    } catch (err) {
+   212→      toast.error(err instanceof Error ? err.message : 'Upload failed');
+   213→    } finally {
+   214→      setTimeout(() => {
+   215→        setUploading(false);
+   216→        setUploadProgress(0);
+   217→      }, 600);
+   218→    }
+   219→  }, [activeWorkspace]);
+   220→
+   221→  const handleDrop = useCallback((e: React.DragEvent) => {
+   222→    e.preventDefault();
+   223→    setDragOver(false);
+   224→    const file = e.dataTransfer.files[0];
+   225→    if (file) handleUpload(file);
+   226→  }, [handleUpload]);
+   227→
+   228→  const handleFileSelect = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+   229→    const file = e.target.files?.[0];
+   230→    if (file) handleUpload(file);
+   231→    if (fileInputRef.current) fileInputRef.current.value = '';
+   232→  }, [handleUpload]);
+   233→
+   234→  // ---------------------------------------------------------------------------
+   235→  // Delete
+   236→  // ---------------------------------------------------------------------------
+   237→
+   238→  const handleDelete = useCallback(async () => {
+   239→    if (!deleteTarget) return;
+   240→    setDeleting(true);
+   241→    try {
+   242→      const res = await fetch(`/api/documents/${deleteTarget.id}`, { method: 'DELETE' });
+   243→      if (!res.ok) throw new Error('Delete failed');
+   244→      setDocuments((prev) => prev.filter((d) => d.id !== deleteTarget.id));
+   245→      toast.success(`Deleted ${deleteTarget.filename}`);
+   246→    } catch {
+   247→      toast.error('Failed to delete document');
+   248→    } finally {
+   249→      setDeleting(false);
+   250→      setDeleteTarget(null);
+   251→    }
+   252→  }, [deleteTarget]);
+   253→
+   254→  // ---------------------------------------------------------------------------
+   255→  // Test RAG
+   256→  // ---------------------------------------------------------------------------
+   257→
+   258→  const handleTestRag = useCallback(async () => {
+   259→    if (!testQuery.trim()) return;
+   260→    setTestLoading(true);
+   261→    setTestResults([]);
+   262→    // Simulate RAG results
+   263→    await new Promise((r) => setTimeout(r, 1200));
+   264→    setTestResults([
+   265→      { text: `Relevant chunk for "${testQuery}": The NEXUS orchestration pipeline consists of five specialized agents that collaborate through a structured debate process...`, score: 0.92 },
+   266→      { text: `Additional context: Each agent in the NEXUS system has a distinct role — Architect plans, Forge implements, Sentinel reviews...`, score: 0.85 },
+   267→      { text: `Supplementary information: The debate phases include draft, critique, rebuttal, arbitrate, verify, and commit...`, score: 0.73 },
+   268→    ]);
+   269→    setTestLoading(false);
+   270→  }, [testQuery]);
+   271→
+   272→  // ---------------------------------------------------------------------------
+   273→  // Render
+   274→  // ---------------------------------------------------------------------------
+   275→
+   276→  return (
+   277→    <TooltipProvider>
+   278→      <div className="flex h-full flex-col min-h-0">
+   279→        {/* Header */}
+   280→        <div className="flex flex-col gap-1 border-b border-border/60 px-6 py-4">
+   281→          <div className="flex items-center justify-between">
+   282→            <div className="flex items-center gap-3">
+   283→              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-600/15 border border-violet-500/20">
+   284→                <Database className="h-4.5 w-4.5 text-violet-400" />
+   285→              </div>
+   286→              <div>
+   287→                <h1 className="text-base font-semibold text-foreground">Knowledge Base</h1>
+   288→                <p className="text-xs text-muted-foreground/70">Upload documents for RAG-enhanced responses</p>
+   289→              </div>
+   290→            </div>
+   291→            <Button
+   292→              size="sm"
+   293→              className="bg-violet-600 hover:bg-violet-500 text-white gap-1.5"
+   294→              onClick={() => fileInputRef.current?.click()}
+   295→              disabled={uploading}
+   296→            >
+   297→              <Upload className="h-3.5 w-3.5" />
+   298→              Upload Document
+   299→            </Button>
+   300→          </div>
+   301→        </div>
+   302→
+   303→        <input
+   304→          ref={fileInputRef}
+   305→          type="file"
+   306→          accept={ACCEPTED_MIME}
+   307→          className="hidden"
+   308→          onChange={handleFileSelect}
+   309→        />
+   310→
+   311→        <ScrollArea className="flex-1 min-h-0">
+   312→          <div className="mx-auto w-full max-w-5xl space-y-6 p-6">
+   313→
+   314→            {/* Upload Zone */}
+   315→            <div
+   316→              className={`relative rounded-xl border-2 border-dashed transition-all duration-200 cursor-pointer ${
+   317→                dragOver
+   318→                  ? 'border-violet-500 bg-violet-500/5'
+   319→                  : 'border-input/60 hover:border-border bg-card/40'
+   320→              }`}
+   321→              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+   322→              onDragLeave={() => setDragOver(false)}
+   323→              onDrop={handleDrop}
+   324→              onClick={() => fileInputRef.current?.click()}
+   325→            >
+   326→              <div className="flex flex-col items-center justify-center gap-3 py-10">
+   327→                <div className={`rounded-xl p-3 transition-colors ${dragOver ? 'bg-violet-600/15' : 'bg-muted/60'}`}>
+   328→                  <Upload className={`h-6 w-6 ${dragOver ? 'text-violet-400' : 'text-muted-foreground/70'}`} />
+   329→                </div>
+   330→                <div className="text-center">
+   331→                  <p className="text-sm font-medium text-secondary-foreground">
+   332→                    {dragOver ? 'Drop your file here' : 'Drag & drop a file, or click to browse'}
+   333→                  </p>
+   334→                  <p className="mt-1 text-xs text-muted-foreground/70">
+   335→                    Supports {ACCEPTED_EXTENSIONS.join(', ')}
+   336→                  </p>
+   337→                </div>
+   338→              </div>
+   339→
+   340→              {/* Upload Progress */}
+   341→              {uploading && (
+   342→                <div className="mx-8 mb-6">
+   343→                  <div className="flex items-center justify-between mb-1.5">
+   344→                    <span className="text-xs text-muted-foreground">Uploading...</span>
+   345→                    <span className="text-xs text-muted-foreground">{Math.round(uploadProgress)}%</span>
+   346→                  </div>
+   347→                  <Progress value={uploadProgress} className="h-1.5" />
+   348→                </div>
+   349→              )}
+   350→            </div>
+   351→
+   352→            {/* Workspace Selector */}
+   353→            <div className="flex items-center gap-3">
+   354→              <Label className="text-xs text-muted-foreground/70 shrink-0">Workspace</Label>
+   355→              <Select value={activeWorkspace} onValueChange={setActiveWorkspace}>
+   356→                <SelectTrigger className="w-48 h-8 bg-card border-border text-secondary-foreground text-xs">
+   357→                  <SelectValue />
+   358→                </SelectTrigger>
+   359→                <SelectContent className="bg-popover border-border">
+   360→                  <SelectItem value="default" className="text-secondary-foreground">default</SelectItem>
+   361→                </SelectContent>
+   362→              </Select>
+   363→            </div>
+   364→
+   365→            {/* Document List or Empty State */}
+   366→            {loading ? (
+   367→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   368→                {Array.from({ length: 3 }).map((_, i) => (
+   369→                  <Skeleton key={i} className="h-32 rounded-xl bg-card/60" />
+   370→                ))}
+   371→              </div>
+   372→            ) : documents.length === 0 ? (
+   373→              <div className="flex flex-col items-center justify-center py-16">
+   374→                <div className="flex h-14 w-14 items-center justify-center rounded-2xl">
+   375→                  <FileText className="h-6 w-6 text-muted-foreground/50" />
+   376→                </div>
+   377→                <p className="text-sm font-medium text-muted-foreground">No documents yet</p>
+   378→                <p className="mt-1 text-xs text-muted-foreground/50 max-w-xs text-center">
+   379→                  Upload files to build your knowledge base. Documents are chunked and embedded for RAG retrieval.
+   380→                </p>
+   381→              </div>
+   382→            ) : (
+   383→              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+   384→                {documents.map((doc) => {
+   385→                  const Icon = fileIconForType(doc.fileType);
+   386→                  const cat = fileCategory(doc.fileType);
+   387→                  return (
+   388→                    <Card
+   389→                      key={doc.id}
+   390→                      className="group relative bg-card/80 border-border/60 hover:border-violet-500/30 hover:shadow-[0_0_20px_rgba(139,92,246,0.06)] transition-all duration-200 overflow-hidden"
+   391→                    >
+   392→                      <CardContent className="p-4">
+   393→                        <div className="flex items-start justify-between gap-2">
+   394→                          <div className="flex items-start gap-3 min-w-0">
+   395→                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg">
+   396→                              <Icon className="h-4 w-4 text-muted-foreground" />
+   397→                            </div>
+   398→                            <div className="min-w-0">
+   399→                              <p className="text-sm font-medium text-secondary-foreground truncate" title={doc.filename}>
+   400→                                {doc.filename}
+   401→                              </p>
+   402→                              <div className="mt-1 flex items-center gap-2 flex-wrap">
+   403→                                <span className="text-xs text-muted-foreground/70">{formatFileSize(doc.fileSize)}</span>
+   404→                                <Badge
+   405→                                  variant="outline"
+   406→                                  className={`text-[10px] px-1.5 py-0 h-4 border ${categoryColor(cat)}`}
+   407→                                >
+   408→                                  {doc.fileType.toUpperCase()}
+   409→                                </Badge>
+   410→                                {doc.chunkCount > 0 && (
+   411→                                  <Badge
+   412→                                    variant="outline"
+   413→                                    className="text-[10px] px-1.5 py-0 h-4 border-violet-700/40 bg-violet-900/20 text-violet-400"
+   414→                                  >
+   415→                                    {doc.chunkCount} chunks
+   416→                                  </Badge>
+   417→                                )}
+   418→                              </div>
+   419→                              <p className="mt-1.5 text-[11px] text-muted-foreground/50">{relativeTime(doc.createdAt)}</p>
+   420→                            </div>
+   421→                          </div>
+   422→                          <Tooltip>
+   423→                            <TooltipTrigger asChild>
+   424→                              <Button
+   425→                                variant="ghost"
+   426→                                size="icon"
+   427→                                className="h-7 w-7 text-muted-foreground/50 hover:text-red-400 hover:bg-red-500/10 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+   428→                                onClick={(e) => {
+   429→                                  e.stopPropagation();
+   430→                                  setDeleteTarget(doc);
+   431→                                }}
+   432→                              >
+   433→                                <Trash2 className="h-3.5 w-3.5" />
+   434→                              </Button>
+   435→                            </TooltipTrigger>
+   436→                            <TooltipContent side="left" >
+   437→                              Delete document
+   438→                            </TooltipContent>
+   439→                          </Tooltip>
+   440→                        </div>
+   441→                      </CardContent>
+   442→                    </Card>
+   443→                  );
+   444→                })}
+   445→              </div>
+   446→            )}
+   447→
+   448→            {/* RAG Settings */}
+   449→            <Card className="bg-card/80 border-border/60">
+   450→              <CardHeader className="pb-3">
+   451→                <div className="flex items-center justify-between">
+   452→                  <div>
+   453→                    <CardTitle className="text-sm font-semibold text-secondary-foreground">RAG Configuration</CardTitle>
+   454→                    <CardDescription className="text-xs text-muted-foreground/70 mt-0.5">
+   455→                      Tune retrieval-augmented generation parameters
+   456→                    </CardDescription>
+   457→                  </div>
+   458→                  <Button
+   459→                    variant="outline"
+   460→                    size="sm"
+   461→                    className="border-input text-secondary-foreground hover:"
+   462→                    onClick={() => { setTestQuery(''); setTestResults([]); setTestDialogOpen(true); }}
+   463→                  >
+   464→                    <Search className="h-3 w-3" />
+   465→                    Test RAG
+   466→                  </Button>
+   467→                </div>
+   468→              </CardHeader>
+   469→              <CardContent className="space-y-5">
+   470→                {/* Chunk Size */}
+   471→                <div className="space-y-2">
+   472→                  <div className="flex items-center justify-between">
+   473→                    <Label className="text-xs text-muted-foreground">Chunk Size</Label>
+   474→                    <span className="text-xs font-mono text-violet-400">{ragSettings.chunkSize}</span>
+   475→                  </div>
+   476→                  <Slider
+   477→                    value={[ragSettings.chunkSize]}
+   478→                    min={500}
+   479→                    max={4000}
+   480→                    step={100}
+   481→                    onValueChange={([v]) => setRagSettings((s) => ({ ...s, chunkSize: v }))}
+   482→                    className="py-1"
+   483→                  />
+   484→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   485→                    <span>500</span>
+   486→                    <span>4000</span>
+   487→                  </div>
+   488→                </div>
+   489→
+   490→                {/* Chunk Overlap */}
+   491→                <div className="space-y-2">
+   492→                  <div className="flex items-center justify-between">
+   493→                    <Label className="text-xs text-muted-foreground">Chunk Overlap</Label>
+   494→                    <span className="text-xs font-mono text-violet-400">{ragSettings.chunkOverlap}</span>
+   495→                  </div>
+   496→                  <Slider
+   497→                    value={[ragSettings.chunkOverlap]}
+   498→                    min={0}
+   499→                    max={500}
+   500→                    step={25}
+   501→                    onValueChange={([v]) => setRagSettings((s) => ({ ...s, chunkOverlap: v }))}
+   502→                    className="py-1"
+   503→                  />
+   504→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   505→                    <span>0</span>
+   506→                    <span>500</span>
+   507→                  </div>
+   508→                </div>
+   509→
+   510→                <Separator  />
+   511→
+   512→                {/* Embedding Model */}
+   513→                <div className="space-y-2">
+   514→                  <Label className="text-xs text-muted-foreground">Embedding Model</Label>
+   515→                  <Input
+   516→                    value={ragSettings.embeddingModel}
+   517→                    onChange={(e) => setRagSettings((s) => ({ ...s, embeddingModel: e.target.value }))}
+   518→                    className="h-8"
+   519→                  />
+   520→                </div>
+   521→
+   522→                {/* Top-K */}
+   523→                <div className="space-y-2">
+   524→                  <div className="flex items-center justify-between">
+   525→                    <Label className="text-xs text-muted-foreground">Top-K Results</Label>
+   526→                    <span className="text-xs font-mono text-violet-400">{ragSettings.topK}</span>
+   527→                  </div>
+   528→                  <Slider
+   529→                    value={[ragSettings.topK]}
+   530→                    min={1}
+   531→                    max={20}
+   532→                    step={1}
+   533→                    onValueChange={([v]) => setRagSettings((s) => ({ ...s, topK: v }))}
+   534→                    className="py-1"
+   535→                  />
+   536→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   537→                    <span>1</span>
+   538→                    <span>20</span>
+   539→                  </div>
+   540→                </div>
+   541→
+   542→                {/* Similarity Threshold */}
+   543→                <div className="space-y-2">
+   544→                  <div className="flex items-center justify-between">
+   545→                    <Label className="text-xs text-muted-foreground">Similarity Threshold</Label>
+   546→                    <span className="text-xs font-mono text-violet-400">{ragSettings.similarityThreshold.toFixed(2)}</span>
+   547→                  </div>
+   548→                  <Slider
+   549→                    value={[ragSettings.similarityThreshold]}
+   550→                    min={0}
+   551→                    max={1}
+   552→                    step={0.05}
+   553→                    onValueChange={([v]) => setRagSettings((s) => ({ ...s, similarityThreshold: v }))}
+   554→                    className="py-1"
+   555→                  />
+   556→                  <div className="flex justify-between text-[10px] text-muted-foreground/50">
+   557→                    <span>0.0</span>
+   558→                    <span>1.0</span>
+   559→                  </div>
+   560→                </div>
+   561→              </CardContent>
+   562→            </Card>
+   563→
+   564→          </div>
+   565→        </ScrollArea>
+   566→
+   567→        {/* Delete Confirmation Dialog */}
+   568→        <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+   569→          <AlertDialogContent className="bg-popover border-border">
+   570→            <AlertDialogHeader>
+   571→              <AlertDialogTitle className="text-popover-foreground">Delete Document</AlertDialogTitle>
+   572→              <AlertDialogDescription className="text-muted-foreground">
+   573→                Are you sure you want to delete <span className="text-secondary-foreground font-medium">{deleteTarget?.filename}</span>? This will also remove all associated embeddings and cannot be undone.
+   574→              </AlertDialogDescription>
+   575→            </AlertDialogHeader>
+   576→            <AlertDialogFooter>
+   577→              <AlertDialogCancel >Cancel</AlertDialogCancel>
+   578→              <AlertDialogAction
+   579→                className="bg-red-600 hover:bg-red-500 text-white"
+   580→                onClick={handleDelete}
+   581→                disabled={deleting}
+   582→              >
+   583→                {deleting ? 'Deleting...' : 'Delete'}
+   584→              </AlertDialogAction>
+   585→            </AlertDialogFooter>
+   586→          </AlertDialogContent>
+   587→        </AlertDialog>
+   588→
+   589→        {/* Test RAG Dialog */}
+   590→        <Dialog open={testDialogOpen} onOpenChange={setTestDialogOpen}>
+   591→          <DialogContent className="bg-popover border-border max-w-lg">
+   592→            <DialogHeader>
+   593→              <DialogTitle className="text-popover-foreground">Test RAG Retrieval</DialogTitle>
+   594→              <DialogDescription className="text-muted-foreground">
+   595→                Enter a query to test similarity search against your knowledge base.
+   596→              </DialogDescription>
+   597→            </DialogHeader>
+   598→            <div className="space-y-4">
+   599→              <div className="flex gap-2">
+   600→                <Input
+   601→                  value={testQuery}
+   602→                  onChange={(e) => setTestQuery(e.target.value)}
+   603→                  placeholder="How does the debate pipeline work?"
+   604→                  
+   605→                  onKeyDown={(e) => { if (e.key === 'Enter') handleTestRag(); }}
+   606→                />
+   607→                <Button
+   608→                  size="sm"
+   609→                  className="bg-violet-600 hover:bg-violet-500 text-white shrink-0"
+   610→                  onClick={handleTestRag}
+   611→                  disabled={testLoading || !testQuery.trim()}
+   612→                >
+   613→                  {testLoading ? '...' : 'Search'}
+   614→                </Button>
+   615→              </div>
+   616→
+   617→              {testLoading && (
+   618→                <div className="flex items-center justify-center py-8">
+   619→                  <div className="flex items-center gap-2 text-muted-foreground/70 text-sm">
+   620→                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-border border-t-violet-500" />
+   621→                    Searching...
+   622→                  </div>
+   623→                </div>
+   624→              )}
+   625→
+   626→              {testResults.length > 0 && (
+   627→                <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+   628→                  {testResults.map((result, i) => (
+   629→                    <div
+   630→                      key={i}
+   631→                      className="rounded-lg border border-border"
+   632→                    >
+   633→                      <div className="flex items-center justify-between">
+   634→                        <Badge
+   635→                          variant="outline"
+   636→                          className="text-[10px] h-4 px-1.5 border-violet-700/40 bg-violet-900/20 text-violet-400"
+   637→                        >
+   638→                          Chunk #{i + 1}
+   639→                        </Badge>
+   640→                        <span className="text-[11px] font-mono text-muted-foreground/70">
+   641→                          Score: <span className="text-violet-400">{result.score.toFixed(2)}</span>
+   642→                        </span>
+   643→                      </div>
+   644→                      <p className="text-xs text-muted-foreground leading-relaxed">{result.text}</p>
+   645→                    </div>
+   646→                  ))}
+   647→                </div>
+   648→              )}
+   649→
+   650→              {documents.length === 0 && testResults.length === 0 && !testLoading && (
+   651→                <div className="flex items-center justify-center py-6">
+   652→                  <p className="text-xs text-muted-foreground/50">No documents uploaded yet. Upload some documents to test RAG retrieval.</p>
+   653→                </div>
+   654→              )}
+   655→            </div>
+   656→          </DialogContent>
+   657→        </Dialog>
+   658→      </div>
+   659→    </TooltipProvider>
+   660→  );
+   661→}
+   662→
