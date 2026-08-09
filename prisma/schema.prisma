@@ -1,0 +1,111 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model LlmProvider {
+  id        String   @id @default(cuid())
+  name      String
+  type      String   // openai, anthropic, google, mistral, groq, together, ollama, lmstudio, vllm, llamacpp, koboldcpp, custom
+  baseUrl   String   @default("")
+  apiKey    String   @default("")
+  isLocal   Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  models    String   @default("[]") // JSON array of model IDs
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  agents    AgentConfig[]
+}
+
+model AgentConfig {
+  id           String   @id @default(cuid())
+  agentId      String   // architect, forge, sentinel, perception, scribe
+  name         String
+  description  String
+  systemPrompt String
+  providerId   String?
+  modelId      String   @default("")
+  temperature  Float    @default(0.7)
+  maxTokens    Int      @default(4096)
+  tools        String   @default("[]") // JSON array of allowed tool names
+  is_active    Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  provider     LlmProvider? @relation(fields: [providerId], references: [id])
+
+  @@index([providerId])
+  @@unique([agentId])
+}
+
+model ChatSession {
+  id        String   @id @default(cuid())
+  title     String   @default("New Session")
+  mode      String   @default("council") // fast, council, redteam
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  messages  ChatMessage[]
+}
+
+model ChatMessage {
+  id                  String    @id @default(cuid())
+  sessionId           String
+  role                String    // user, architect, forge, sentinel, perception, scribe, system
+  content             String
+  agentName           String    @default("")
+  modelUsed           String    @default("")
+  tokens              Int       @default(0)
+  cost                Float     @default(0)
+  toolCalls           String    @default("[]") // JSON array of tool invocations
+  debateData          String    @default("") // JSON for debate phase info
+  workspaceSnapshotId String? // message id of the workspace snapshot captured after this turn
+  createdAt           DateTime  @default(now())
+  session             ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([sessionId, createdAt])
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  filename    String
+  title       String
+  content     String   @default("")
+  fileType    String   @default("")
+  fileSize    Int      @default(0)
+  embedding   String   @default("[]") // JSON array of floats
+  chunkCount  Int      @default(0)
+  workspaceId String   @default("default")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+model McpServer {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @default("")
+  transport   String   @default("stdio") // stdio, sse, streamable-http
+  command     String   @default("")
+  args        String   @default("[]") // JSON array
+  url         String   @default("")
+  envVars     String   @default("{}") // JSON object
+  isActive    Boolean  @default(true)
+  tools       String   @default("[]") // JSON array of tool definitions
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AppSettings {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  updatedAt DateTime @updatedAt
+}
